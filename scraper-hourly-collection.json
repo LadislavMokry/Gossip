@@ -45,7 +45,8 @@
           "response": {
             "response": {
               "responseFormat": "text",
-              "includeHeadersAndStatus": true
+              "includeHeadersAndStatus": true,
+              "neverError": true
             }
           }
         }
@@ -84,7 +85,8 @@
           "response": {
             "response": {
               "responseFormat": "text",
-              "includeHeadersAndStatus": true
+              "includeHeadersAndStatus": true,
+              "neverError": true
             }
           }
         }
@@ -123,7 +125,8 @@
           "response": {
             "response": {
               "responseFormat": "text",
-              "includeHeadersAndStatus": true
+              "includeHeadersAndStatus": true,
+              "neverError": true
             }
           }
         }
@@ -162,7 +165,8 @@
           "response": {
             "response": {
               "responseFormat": "text",
-              "includeHeadersAndStatus": true
+              "includeHeadersAndStatus": true,
+              "neverError": true
             }
           }
         }
@@ -201,7 +205,8 @@
           "response": {
             "response": {
               "responseFormat": "text",
-              "includeHeadersAndStatus": true
+              "includeHeadersAndStatus": true,
+              "neverError": true
             }
           }
         }
@@ -215,147 +220,167 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
-              "id": "status-check-topky",
-              "operator": {
-                "type": "number",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200
+              "id": "url-topky",
+              "name": "source_url",
+              "value": "https://www.topky.sk/se/15/Prominenti",
+              "type": "string"
+            },
+            {
+              "id": "website-topky",
+              "name": "source_website",
+              "value": "topky.sk",
+              "type": "string"
+            },
+            {
+              "id": "body-topky",
+              "name": "raw_html",
+              "value": "={{ $json.body }}",
+              "type": "string"
             }
           ]
         }
       },
-      "id": "if-topky",
-      "name": "IF - Check Topky Status",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "set-topky",
+      "name": "Set - Topky Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [650, 100]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
-              "id": "status-check-cas",
-              "operator": {
-                "type": "number",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200
+              "id": "url-cas",
+              "name": "source_url",
+              "value": "https://www.cas.sk/r/prominenti",
+              "type": "string"
+            },
+            {
+              "id": "website-cas",
+              "name": "source_website",
+              "value": "cas.sk",
+              "type": "string"
+            },
+            {
+              "id": "body-cas",
+              "name": "raw_html",
+              "value": "={{ $json.body }}",
+              "type": "string"
             }
           ]
         }
       },
-      "id": "if-cas",
-      "name": "IF - Check Cas Status",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "set-cas",
+      "name": "Set - Cas Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [650, 250]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
-              "id": "status-check-pluska",
-              "operator": {
-                "type": "number",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200
+              "id": "url-pluska",
+              "name": "source_url",
+              "value": "https://www1.pluska.sk/r/soubiznis",
+              "type": "string"
+            },
+            {
+              "id": "website-pluska",
+              "name": "source_website",
+              "value": "pluska.sk",
+              "type": "string"
+            },
+            {
+              "id": "body-pluska",
+              "name": "raw_html",
+              "value": "={{ $json.body }}",
+              "type": "string"
             }
           ]
         }
       },
-      "id": "if-pluska",
-      "name": "IF - Check Pluska Status",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "set-pluska",
+      "name": "Set - Pluska Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [650, 400]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
-              "id": "status-check-refresher",
-              "operator": {
-                "type": "number",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200
+              "id": "url-refresher",
+              "name": "source_url",
+              "value": "https://refresher.sk/osobnosti",
+              "type": "string"
+            },
+            {
+              "id": "website-refresher",
+              "name": "source_website",
+              "value": "refresher.sk",
+              "type": "string"
+            },
+            {
+              "id": "body-refresher",
+              "name": "raw_html",
+              "value": "={{ $json.body }}",
+              "type": "string"
             }
           ]
         }
       },
-      "id": "if-refresher",
-      "name": "IF - Check Refresher Status",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "set-refresher",
+      "name": "Set - Refresher Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [650, 550]
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": true,
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
             {
-              "id": "status-check-startitup",
-              "operator": {
-                "type": "number",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $json.statusCode }}",
-              "rightValue": 200
+              "id": "url-startitup",
+              "name": "source_url",
+              "value": "https://www.startitup.sk/kategoria/kultura/",
+              "type": "string"
+            },
+            {
+              "id": "website-startitup",
+              "name": "source_website",
+              "value": "startitup.sk",
+              "type": "string"
+            },
+            {
+              "id": "body-startitup",
+              "name": "raw_html",
+              "value": "={{ $json.body }}",
+              "type": "string"
             }
           ]
         }
       },
-      "id": "if-startitup",
-      "name": "IF - Check Startitup Status",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "id": "set-startitup",
+      "name": "Set - Startitup Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [650, 700]
     },
     {
@@ -368,15 +393,15 @@
           "fieldValues": [
             {
               "fieldId": "source_url",
-              "fieldValue": "={{ $json.url }}"
+              "fieldValue": "={{ $json.source_url }}"
             },
             {
               "fieldId": "source_website",
-              "fieldValue": "topky.sk"
+              "fieldValue": "={{ $json.source_website }}"
             },
             {
               "fieldId": "raw_html",
-              "fieldValue": "={{ $json.body }}"
+              "fieldValue": "={{ $json.raw_html }}"
             },
             {
               "fieldId": "scraped_at",
@@ -409,15 +434,15 @@
           "fieldValues": [
             {
               "fieldId": "source_url",
-              "fieldValue": "={{ $json.url }}"
+              "fieldValue": "={{ $json.source_url }}"
             },
             {
               "fieldId": "source_website",
-              "fieldValue": "cas.sk"
+              "fieldValue": "={{ $json.source_website }}"
             },
             {
               "fieldId": "raw_html",
-              "fieldValue": "={{ $json.body }}"
+              "fieldValue": "={{ $json.raw_html }}"
             },
             {
               "fieldId": "scraped_at",
@@ -450,15 +475,15 @@
           "fieldValues": [
             {
               "fieldId": "source_url",
-              "fieldValue": "={{ $json.url }}"
+              "fieldValue": "={{ $json.source_url }}"
             },
             {
               "fieldId": "source_website",
-              "fieldValue": "pluska.sk"
+              "fieldValue": "={{ $json.source_website }}"
             },
             {
               "fieldId": "raw_html",
-              "fieldValue": "={{ $json.body }}"
+              "fieldValue": "={{ $json.raw_html }}"
             },
             {
               "fieldId": "scraped_at",
@@ -491,15 +516,15 @@
           "fieldValues": [
             {
               "fieldId": "source_url",
-              "fieldValue": "={{ $json.url }}"
+              "fieldValue": "={{ $json.source_url }}"
             },
             {
               "fieldId": "source_website",
-              "fieldValue": "refresher.sk"
+              "fieldValue": "={{ $json.source_website }}"
             },
             {
               "fieldId": "raw_html",
-              "fieldValue": "={{ $json.body }}"
+              "fieldValue": "={{ $json.raw_html }}"
             },
             {
               "fieldId": "scraped_at",
@@ -532,15 +557,15 @@
           "fieldValues": [
             {
               "fieldId": "source_url",
-              "fieldValue": "={{ $json.url }}"
+              "fieldValue": "={{ $json.source_url }}"
             },
             {
               "fieldId": "source_website",
-              "fieldValue": "startitup.sk"
+              "fieldValue": "={{ $json.source_website }}"
             },
             {
               "fieldId": "raw_html",
-              "fieldValue": "={{ $json.body }}"
+              "fieldValue": "={{ $json.raw_html }}"
             },
             {
               "fieldId": "scraped_at",
@@ -600,7 +625,7 @@
       "main": [
         [
           {
-            "node": "IF - Check Topky Status",
+            "node": "Set - Topky Data",
             "type": "main",
             "index": 0
           }
@@ -611,7 +636,7 @@
       "main": [
         [
           {
-            "node": "IF - Check Cas Status",
+            "node": "Set - Cas Data",
             "type": "main",
             "index": 0
           }
@@ -622,7 +647,7 @@
       "main": [
         [
           {
-            "node": "IF - Check Pluska Status",
+            "node": "Set - Pluska Data",
             "type": "main",
             "index": 0
           }
@@ -633,7 +658,7 @@
       "main": [
         [
           {
-            "node": "IF - Check Refresher Status",
+            "node": "Set - Refresher Data",
             "type": "main",
             "index": 0
           }
@@ -644,14 +669,14 @@
       "main": [
         [
           {
-            "node": "IF - Check Startitup Status",
+            "node": "Set - Startitup Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "IF - Check Topky Status": {
+    "Set - Topky Data": {
       "main": [
         [
           {
@@ -659,11 +684,10 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
-    "IF - Check Cas Status": {
+    "Set - Cas Data": {
       "main": [
         [
           {
@@ -671,11 +695,10 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
-    "IF - Check Pluska Status": {
+    "Set - Pluska Data": {
       "main": [
         [
           {
@@ -683,11 +706,10 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
-    "IF - Check Refresher Status": {
+    "Set - Refresher Data": {
       "main": [
         [
           {
@@ -695,11 +717,10 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
-    "IF - Check Startitup Status": {
+    "Set - Startitup Data": {
       "main": [
         [
           {
@@ -707,8 +728,7 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     }
   },
@@ -718,6 +738,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2025-11-03T00:00:00.000Z",
-  "versionId": "1"
+  "updatedAt": "2025-11-04T00:00:00.000Z",
+  "versionId": "2"
 }
