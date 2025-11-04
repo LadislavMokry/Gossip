@@ -239,7 +239,7 @@
             {
               "id": "body-topky",
               "name": "raw_html",
-              "value": "={{ $json.body }}",
+              "value": "={{ $json.data }}",
               "type": "string"
             }
           ]
@@ -272,7 +272,7 @@
             {
               "id": "body-cas",
               "name": "raw_html",
-              "value": "={{ $json.body }}",
+              "value": "={{ $json.data }}",
               "type": "string"
             }
           ]
@@ -305,7 +305,7 @@
             {
               "id": "body-pluska",
               "name": "raw_html",
-              "value": "={{ $json.body }}",
+              "value": "={{ $json.data }}",
               "type": "string"
             }
           ]
@@ -338,7 +338,7 @@
             {
               "id": "body-refresher",
               "name": "raw_html",
-              "value": "={{ $json.body }}",
+              "value": "={{ $json.data }}",
               "type": "string"
             }
           ]
@@ -371,7 +371,7 @@
             {
               "id": "body-startitup",
               "name": "raw_html",
-              "value": "={{ $json.body }}",
+              "value": "={{ $json.data }}",
               "type": "string"
             }
           ]
