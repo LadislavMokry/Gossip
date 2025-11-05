@@ -24,16 +24,18 @@ This is the implementation roadmap for building a Slovak Celebrity Gossip Conten
 
 ```
 Main Orchestrator Workflow
-├─ Sub-workflow 1A: Data Collection (hourly scraping - 5 Slovak sites)
-├─ Sub-workflow 1B: Extraction (GPT-5 Nano summarization)
-├─ Sub-workflow 1C: First Judge (scoring 1-10, format assignment)
-├─ Sub-workflow 2: Content Generation (3 models in parallel)
-├─ Sub-workflow 3: Second Judge (best version selection)
-├─ Sub-workflow 4A: Media Creation - Images
-├─ Sub-workflow 4B: Media Creation - Videos
-├─ Sub-workflow 4C: Media Creation - Podcasts
-├─ Sub-workflow 5: Publishing (rate-limited, 6 windows/day)
-└─ Sub-workflow 6: Performance Tracking (1hr/6hr/24hr checkpoints)
+├─ Sub-workflow 1A: Data Collection (hourly scraping - 5 Slovak sites) ✅
+├─ Sub-workflow 1B: Link Extraction (extract article URLs from category pages)
+├─ Sub-workflow 1C: Article Scraping (fetch individual article content)
+├─ Sub-workflow 2: Extraction (GPT-5 Nano summarization)
+├─ Sub-workflow 3: First Judge (scoring 1-10, format assignment)
+├─ Sub-workflow 4: Content Generation (3 models in parallel)
+├─ Sub-workflow 5: Second Judge (best version selection)
+├─ Sub-workflow 6A: Media Creation - Images
+├─ Sub-workflow 6B: Media Creation - Videos
+├─ Sub-workflow 6C: Media Creation - Podcasts
+├─ Sub-workflow 7: Publishing (rate-limited, 6 windows/day)
+└─ Sub-workflow 8: Performance Tracking (1hr/6hr/24hr checkpoints)
 ```
 
 ---
@@ -181,47 +183,202 @@ OPENAI_API_KEY=sk-...
 
 ## Phase 1: Data Collection Pipeline (Week 1)
 
-### Status: Not Started
+### Status: In Progress (1A Complete)
 
-### Sub-Workflow 1A: "Scraper - Hourly Data Collection"
+### Sub-Workflow 1A: "Scraper - Hourly Data Collection" ✅ COMPLETED
 
-**Purpose**: Scrapes 5 Slovak celebrity news sites every hour
+**Purpose**: Scrapes 5 Slovak celebrity news CATEGORY PAGES every hour
+
+**What It Does**:
+- Fetches category/listing pages (e.g., topky.sk/se/15/Prominenti)
+- These pages contain LINKS to individual articles, not full article content
+- Stores category page HTML in Supabase articles table
 
 **Nodes**:
 1. **Schedule Trigger** - Cron: `0 * * * *` (every hour)
 2. **HTTP Request** (5 parallel branches):
-   - topky.sk/celebrity
-   - cas.sk/celebrity
-   - pluska.sk/celebrity
-   - refresher.sk/celebrity
-   - startitup.sk/celebrity
-3. **IF Node** (per source) - Check for HTTP 200 status
+   - topky.sk/se/15/Prominenti
+   - cas.sk/r/prominenti
+   - pluska.sk/r/soubiznis
+   - refresher.sk/osobnosti
+   - startitup.sk/kategoria/kultura/
+3. **Set Node** (per source) - Format data with source_url, source_website, raw_html
 4. **Supabase Insert** - Store raw HTML
-5. **Error Handler** - Continue on individual source failure
+5. **Error Handler** - Continue on individual source failure (onError: continueRegularOutput)
+
+**File Location**: `scraper-hourly-collection.json`
+
+**API Keys Required**: `SUPABASE_URL`, `SUPABASE_KEY` ✅
+
+**Success Criteria**:
+- [x] Executes every hour automatically
+- [x] Stores HTML from at least 3/5 sources
+- [x] Continues on individual failures
+- [x] No duplicate URLs stored
+
+---
+
+### Sub-Workflow 1B: "Link Extractor - Article URL Discovery"
+
+**Purpose**: Extracts individual article URLs from category page HTML
+
+**What It Does**:
+- Reads category HTML from articles table (where raw_html contains links)
+- Extracts URLs of individual articles using regex/parsing
+- Stores unique article URLs (deduplication)
+- Marks category pages as processed
+
+**Input**: Category page HTML from Sub-Workflow 1A
+**Output**: Table of article URLs to scrape
+
+**Nodes**:
+1. **Schedule Trigger** - Every 15 minutes (runs after 1A completes)
+2. **Supabase Query** - Get category pages (`processed = FALSE`, filter by source_url pattern)
+3. **Code Node (JavaScript)** - Extract article URLs:
+```javascript
+const items = $input.all();
+const results = [];
+
+for (const item of items) {
+  const html = item.json.raw_html;
+  const source_website = item.json.source_website;
+
+  // URL patterns per website
+  const patterns = {
+    'topky.sk': /<a[^>]+href="(https:\/\/www\.topky\.sk\/clanok\/\d+\/[^"]+)"/gi,
+    'cas.sk': /<a[^>]+href="(https:\/\/www\.cas\.sk\/clanok\/\d+\/[^"]+)"/gi,
+    'pluska.sk': /<a[^>]+href="(https:\/\/www\d*\.pluska\.sk\/[^"]+)"/gi,
+    'refresher.sk': /<a[^>]+href="(https:\/\/refresher\.sk\/\d+\/[^"]+)"/gi,
+    'startitup.sk': /<a[^>]+href="(https:\/\/www\.startitup\.sk\/[^"]+)"/gi
+  };
+
+  const regex = patterns[source_website];
+  if (!regex) continue;
+
+  const urls = [...html.matchAll(regex)].map(match => match[1]);
+  const uniqueUrls = [...new Set(urls)]; // Deduplicate
+
+  for (const url of uniqueUrls) {
+    results.push({
+      json: {
+        article_url: url,
+        source_website: source_website,
+        category_page_id: item.json.id,
+        discovered_at: new Date().toISOString()
+      }
+    });
+  }
+}
+
+return results;
+```
+4. **Supabase Insert** - Store article URLs (table: `article_urls` with UNIQUE constraint)
+5. **Supabase Update** - Mark category page as `processed = TRUE`
+
+**Database Schema Addition**:
+```sql
+CREATE TABLE article_urls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  article_url TEXT NOT NULL UNIQUE,
+  source_website TEXT NOT NULL,
+  category_page_id UUID REFERENCES articles(id) ON DELETE CASCADE,
+  scraped BOOLEAN DEFAULT FALSE,
+  discovered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_article_urls_scraped ON article_urls(scraped) WHERE scraped = FALSE;
+CREATE INDEX idx_article_urls_website ON article_urls(source_website);
+```
 
 **API Keys Required**: `SUPABASE_URL`, `SUPABASE_KEY`
 
 **Testing Strategy**:
-- Manual trigger with 1-2 sources first
-- Check raw HTML is stored correctly
-- Verify deduplication (source_url UNIQUE constraint)
-- Test error handling (disconnect internet for one source)
+- Test with 1-2 category pages first
+- Verify URL regex patterns capture article links
+- Check deduplication works (UNIQUE constraint prevents duplicates)
+- Confirm category pages marked as processed
 
 **Success Criteria**:
-- [ ] Executes every hour automatically
-- [ ] Stores HTML from at least 3/5 sources
-- [ ] Continues on individual failures
-- [ ] No duplicate URLs stored
+- [ ] Extracts article URLs from category HTML
+- [ ] Deduplicates URLs correctly
+- [ ] Stores 10-30 article URLs per category page
+- [ ] Marks category pages as processed
+- [ ] No errors on malformed HTML
 
 ---
 
-### Sub-Workflow 1B: "Extraction - HTML to Summary"
+### Sub-Workflow 1C: "Article Scraper - Full Content Collection"
 
-**Purpose**: Converts raw HTML (50k-100k tokens) to summaries (~500 tokens) using GPT-5 Nano
+**Purpose**: Fetches full HTML of individual articles for content extraction
+
+**What It Does**:
+- Reads article URLs from `article_urls` table
+- Fetches complete article pages (these contain the full story)
+- Stores article HTML in `articles` table for extraction
+- Marks URLs as scraped
+
+**Input**: Article URLs from Sub-Workflow 1B
+**Output**: Full article HTML ready for GPT-5 Nano extraction
 
 **Nodes**:
 1. **Schedule Trigger** - Every 10 minutes
-2. **Supabase Query** - Get unprocessed articles (`processed = FALSE`)
+2. **Supabase Query** - Get unscraped article URLs (`scraped = FALSE`, LIMIT 20)
+3. **SplitInBatches** - Batch size: 10 (parallel fetching)
+4. **HTTP Request Node** - Fetch article page:
+   - Method: GET
+   - URL: `{{ $json.article_url }}`
+   - Headers:
+     - User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+     - Accept: text/html
+     - Accept-Language: sk-SK,sk;q=0.9
+   - Timeout: 30000ms
+   - Options: neverError: true, includeHeadersAndStatus: true
+5. **IF Node** - Check HTTP status = 200
+6. **Set Node** - Format for database:
+```javascript
+{
+  source_url: $json.article_url,
+  source_website: $json.source_website,
+  raw_html: $json.data,
+  scraped_at: $now
+}
+```
+7. **Supabase Insert** - Store in `articles` table
+8. **Supabase Update** - Mark URL as `scraped = TRUE` in `article_urls` table
+
+**API Keys Required**: `SUPABASE_URL`, `SUPABASE_KEY`
+
+**Testing Strategy**:
+- Test with 5-10 article URLs first
+- Verify complete article HTML captured
+- Check error handling for 404/timeout
+- Confirm article content (not just headers/navigation)
+
+**Success Criteria**:
+- [ ] Fetches 20 articles every 10 minutes (120/hour max)
+- [ ] Stores full article HTML (50k-100k tokens)
+- [ ] Handles failed requests gracefully
+- [ ] Marks URLs as scraped to prevent re-fetching
+
+---
+
+### Sub-Workflow 2: "Extraction - HTML to Summary"
+
+**Purpose**: Converts raw article HTML (50k-100k tokens) to summaries (~500 tokens) using GPT-5 Nano
+
+**What It Does**:
+- Reads full article HTML from Sub-Workflow 1C
+- Uses GPT-5 Nano to extract title, content, key people
+- Reduces token count by ~98% for downstream processing
+- Prepares articles for First Judge
+
+**Input**: Full article HTML from `articles` table
+**Output**: Clean article summaries ready for judging
+
+**Nodes**:
+1. **Schedule Trigger** - Every 10 minutes
+2. **Supabase Query** - Get unprocessed articles (`processed = FALSE`, `raw_html IS NOT NULL`)
 3. **SplitInBatches** - Batch size: 10-20
 4. **OpenAI Node** (GPT-5 Nano):
    - **System Prompt**: "Extract celebrity news from Slovak HTML. Return JSON: {title, content, key_names}"
@@ -247,7 +404,7 @@ OPENAI_API_KEY=sk-...
 
 ---
 
-### Sub-Workflow 1C: "First Judge - Scoring & Format Assignment"
+### Sub-Workflow 3: "First Judge - Scoring & Format Assignment"
 
 **Purpose**: Scores articles 1-10, assigns content formats based on quality and queue size
 
@@ -299,7 +456,7 @@ return [{json: {minScore}}];
 
 ### Status: Not Started
 
-### Sub-Workflow 2: "Content Generator - Multi-Model Generation"
+### Sub-Workflow 4: "Content Generator - Multi-Model Generation"
 
 **Purpose**: 3 AI models (GPT-5 Mini, Claude Haiku 4.5, Gemini 2.5 Flash) each generate ALL assigned formats in ONE call
 
@@ -370,7 +527,7 @@ return [{json: {minScore}}];
 
 ---
 
-### Sub-Workflow 3: "Second Judge - Best Version Selection"
+### Sub-Workflow 5: "Second Judge - Best Version Selection"
 
 **Purpose**: GPT-5 compares 3 versions per format and selects the best one
 
@@ -407,7 +564,7 @@ return [{json: {minScore}}];
 
 ### Status: Not Started
 
-### Sub-Workflow 4A: "Media Creator - Images"
+### Sub-Workflow 6A: "Media Creator - Images"
 
 **Purpose**: Extract images from source or generate with DALL-E, add text overlay
 
@@ -470,7 +627,7 @@ return [{json: {image_base64: canvas.toDataURL()}}];
 
 ---
 
-### Sub-Workflow 4B: "Media Creator - Videos"
+### Sub-Workflow 6B: "Media Creator - Videos"
 
 **Purpose**: Create TikTok/Reels format videos with voiceover, music, and captions
 
@@ -532,7 +689,7 @@ exec(cmd, (error, stdout, stderr) => {
 
 ---
 
-### Sub-Workflow 4C: "Media Creator - Podcasts"
+### Sub-Workflow 6C: "Media Creator - Podcasts"
 
 **Purpose**: Batch 5 high-scoring articles into podcast episodes with dialogue
 
@@ -590,7 +747,7 @@ ffmpeg -i podcast.mp3 -i logo.png \
 
 ### Status: Not Started
 
-### Sub-Workflow 5: "Publisher - Multi-Platform Posting"
+### Sub-Workflow 7: "Publisher - Multi-Platform Posting"
 
 **Purpose**: Post to Instagram, Facebook, TikTok, YouTube with rate limiting
 
@@ -648,7 +805,7 @@ if (instagramCount > 0) {
 
 ### Status: Not Started
 
-### Sub-Workflow 6: "Performance Tracker - Engagement Metrics"
+### Sub-Workflow 8: "Performance Tracker - Engagement Metrics"
 
 **Purpose**: Measure engagement at 1hr, 6hr, 24hr checkpoints; feed data back to judges
 
