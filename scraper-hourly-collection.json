@@ -387,7 +387,7 @@
       "parameters": {
         "resource": "row",
         "operation": "create",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
@@ -409,7 +409,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "queryName": "upsert"
+        }
       },
       "id": "supabase-topky",
       "name": "Supabase Insert - Topky",
@@ -428,7 +430,7 @@
       "parameters": {
         "resource": "row",
         "operation": "create",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
@@ -450,7 +452,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "queryName": "upsert"
+        }
       },
       "id": "supabase-cas",
       "name": "Supabase Insert - Cas",
@@ -469,7 +473,7 @@
       "parameters": {
         "resource": "row",
         "operation": "create",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
@@ -491,7 +495,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "queryName": "upsert"
+        }
       },
       "id": "supabase-pluska",
       "name": "Supabase Insert - Pluska",
@@ -510,7 +516,7 @@
       "parameters": {
         "resource": "row",
         "operation": "create",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
@@ -532,7 +538,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "queryName": "upsert"
+        }
       },
       "id": "supabase-refresher",
       "name": "Supabase Insert - Refresher",
@@ -551,7 +559,7 @@
       "parameters": {
         "resource": "row",
         "operation": "create",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "fieldsUi": {
           "fieldValues": [
@@ -573,7 +581,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "queryName": "upsert"
+        }
       },
       "id": "supabase-startitup",
       "name": "Supabase Insert - Startitup",

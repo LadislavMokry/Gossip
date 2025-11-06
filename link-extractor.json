@@ -12,7 +12,7 @@
     {
       "parameters": {
         "operation": "getAll",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "returnAll": true,
         "filters": {
           "conditions": [
@@ -140,7 +140,7 @@
     {
       "parameters": {
         "operation": "update",
-        "tableId": "articles",
+        "tableId": "category_pages",
         "dataMode": "defineBelow",
         "valuesToSend": {
           "values": [
