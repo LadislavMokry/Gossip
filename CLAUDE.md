@@ -72,7 +72,7 @@ Performance Tracking (feedback loop)
 
 **Scraping**: Schedule Trigger (cron: `0 * * * *`) → HTTP Request nodes per website → IF nodes for error handling
 
-**Database Operations**: Use Supabase node for CRUD, Postgres node for complex queries
+**Database Operations**: Use Supabase node for all CRUD operations
 - **CRITICAL**: NEVER use `dataMode: "autoMapInputData"` in Supabase nodes - it fails to map fields correctly
 - ALWAYS use `dataMode: "defineBelow"` with explicit field mappings using `fieldsUi.fieldValues`
 - Example:
@@ -86,6 +86,19 @@ Performance Tracking (feedback loop)
     }
   }
   ```
+
+**Upsert Pattern** (Supabase doesn't have native upsert, use pre-check pattern):
+  ```
+  Supabase Get (filter by unique key)
+  → IF node (check if record exists)
+    → TRUE branch: Supabase Update node
+    → FALSE branch: Supabase Insert node
+  ```
+- This pattern avoids duplicate key constraint errors
+- Check for existing record by unique column (e.g., source_url)
+- IF node condition: `{{ $json.id !== undefined }}` or check array length
+- Update branch: Updates existing record with new data
+- Insert branch: Creates new record
 
 **LLM Calls**: OpenAI/Anthropic/Google Gemini nodes with:
 - System prompts for context
