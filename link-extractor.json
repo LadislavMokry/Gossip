@@ -1,0 +1,356 @@
+{
+  "name": "Sub-Workflow 1B: Link Extractor",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e8a3c4d1-5f2a-4b3c-8d1e-9f7a6b5c4d3e",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "articles",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "processed",
+              "keyValue": "false",
+              "condition": "equals"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "name": "Get Unprocessed Pages",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Regex patterns for each Slovak news site\nconst patterns = {\n  'topky.sk': /href=[\"']?(https?:\\/\\/novinky\\.zoznam\\.sk\\/cl\\/\\d+\\/\\d+\\/[^\"'\\s<>?#]+)/gi,\n  'cas.sk': /href=[\"']?(https?:\\/\\/(?:www\\.)?cas\\.sk\\/[a-z-]+\\/[^\"'\\s<>?#]+)/gi,\n  'pluska.sk': /href=[\"']?(https?:\\/\\/[a-z0-9]+\\.pluska\\.sk\\/[a-z-]+\\/[a-z-]+\\/[^\"'\\s<>?#]+)/gi,\n  'refresher.sk': /href=[\"']?(https?:\\/\\/(?:www\\.)?refresher\\.sk\\/\\d+-[^\"'\\s<>?#]+)/gi,\n  'startitup.sk': /href=[\"']?(https?:\\/\\/(?:www\\.)?startitup\\.sk\\/(?!kategoria|autor|tag|static|wp-)[a-z0-9-]+\\/?)/gi\n};\n\nconst item = $input.item.json;\nconst sourceWebsite = item.source_website;\nconst rawHtml = item.raw_html;\nconst categoryPageId = item.id;\n\n// Get the appropriate regex pattern\nconst pattern = patterns[sourceWebsite];\n\nif (!pattern) {\n  throw new Error(`No regex pattern defined for: ${sourceWebsite}`);\n}\n\nif (!rawHtml) {\n  return {\n    json: {\n      category_page_id: categoryPageId,\n      source_website: sourceWebsite,\n      extracted_urls: [],\n      error: 'No raw_html found'\n    }\n  };\n}\n\n// Extract all matching URLs\nconst matches = [];\nlet match;\n\nwhile ((match = pattern.exec(rawHtml)) !== null) {\n  const url = match[1];\n  // Deduplicate within this extraction\n  if (!matches.includes(url)) {\n    matches.push(url);\n  }\n}\n\n// Return structured data for each URL\nconst extractedUrls = matches.map(url => ({\n  article_url: url,\n  source_website: sourceWebsite,\n  category_page_id: categoryPageId\n}));\n\nreturn {\n  json: {\n    category_page_id: categoryPageId,\n    source_website: sourceWebsite,\n    extracted_urls: extractedUrls,\n    total_found: extractedUrls.length\n  }\n};"
+      },
+      "id": "b2c3d4e5-f6a7-4b5c-9d0e-1f2a3b4c5d6e",
+      "name": "Extract Article URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.total_found }}",
+              "rightValue": 0
+            }
+          ]
+        }
+      },
+      "id": "c3d4e5f6-a7b8-4c5d-0e1f-2a3b4c5d6e7f",
+      "name": "Check URLs Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Flatten all extracted URLs from all items into a single array\nconst allUrls = [];\n\nfor (const item of $input.all()) {\n  const urls = item.json.extracted_urls || [];\n  allUrls.push(...urls);\n}\n\n// Return as individual items for batch insert\nreturn allUrls.map(urlData => ({ json: urlData }));"
+      },
+      "id": "d4e5f6a7-b8c9-4d5e-1f2a-3b4c5d6e7f8a",
+      "name": "Prepare Batch Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "article_urls",
+        "dataMode": "autoMapInputData",
+        "options": {
+          "queryName": "upsert"
+        }
+      },
+      "id": "e5f6a7b8-c9d0-4e5f-2a3b-4c5d6e7f8a9b",
+      "name": "Insert Article URLs",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1340, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Get all category page IDs that were processed\nconst processedIds = [];\n\nfor (const item of $input.all()) {\n  const categoryPageId = item.json.category_page_id;\n  if (categoryPageId && !processedIds.includes(categoryPageId)) {\n    processedIds.push(categoryPageId);\n  }\n}\n\nreturn processedIds.map(id => ({ json: { id } }));"
+      },
+      "id": "f6a7b8c9-d0e1-4f5a-3b4c-5d6e7f8a9b0c",
+      "name": "Get Processed IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "articles",
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "key": "processed",
+              "value": "true"
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.id }}",
+              "condition": "equals"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-4a5b-4c5d-6e7f8a9b0c1d",
+      "name": "Mark Pages Processed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1780, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"content\": \"✅ **Link Extraction Complete**\",\n  \"embeds\": [{\n    \"title\": \"Sub-Workflow 1B: Link Extractor\",\n    \"description\": \"Successfully extracted article URLs from category pages.\",\n    \"color\": 3066993,\n    \"fields\": [\n      {\n        \"name\": \"Total URLs Extracted\",\n        \"value\": \"{{ $('Insert Article URLs').itemMatching(0).json.length || 0 }}\",\n        \"inline\": true\n      },\n      {\n        \"name\": \"Pages Processed\",\n        \"value\": \"{{ $('Get Processed IDs').all().length }}\",\n        \"inline\": true\n      },\n      {\n        \"name\": \"Timestamp\",\n        \"value\": \"{{ $now.toISO() }}\",\n        \"inline\": false\n      }\n    ]\n  }]\n}",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4b5c-5d6e-7f8a9b0c1d2e",
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Log when no URLs were found\nconst items = $input.all();\nconst summary = items.map(item => ({\n  source: item.json.source_website,\n  found: item.json.total_found || 0,\n  error: item.json.error || null\n}));\n\nreturn [{\n  json: {\n    message: 'No article URLs found in any category pages',\n    summary: summary,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "Log No URLs Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"content\": \"⚠️ **Link Extraction Warning**\",\n  \"embeds\": [{\n    \"title\": \"Sub-Workflow 1B: No URLs Found\",\n    \"description\": \"No article URLs were extracted from category pages. This may indicate:\n- Empty raw_html fields\n- Regex patterns not matching\n- All pages already processed\",\n    \"color\": 16776960,\n    \"fields\": [\n      {\n        \"name\": \"Summary\",\n        \"value\": \"{{ $json.summary }}\",\n        \"inline\": false\n      },\n      {\n        \"name\": \"Timestamp\",\n        \"value\": \"{{ $now.toISO() }}\",\n        \"inline\": false\n      }\n    ]\n  }]\n}",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "Warning Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.error.message }}",
+        "mode": "catchErrors"
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 520]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"content\": \"🚨 **Link Extraction Failed**\",\n  \"embeds\": [{\n    \"title\": \"Sub-Workflow 1B: Error\",\n    \"description\": \"An error occurred during link extraction.\",\n    \"color\": 15158332,\n    \"fields\": [\n      {\n        \"name\": \"Error Message\",\n        \"value\": \"{{ $json.error.message || 'Unknown error' }}\",\n        \"inline\": false\n      },\n      {\n        \"name\": \"Node\",\n        \"value\": \"{{ $json.error.node || 'Unknown' }}\",\n        \"inline\": true\n      },\n      {\n        \"name\": \"Timestamp\",\n        \"value\": \"{{ $now.toISO() }}\",\n        \"inline\": true\n      }\n    ]\n  }]\n}",
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "Error Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [460, 520]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Unprocessed Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unprocessed Pages": {
+      "main": [
+        [
+          {
+            "node": "Extract Article URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Article URLs": {
+      "main": [
+        [
+          {
+            "node": "Check URLs Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check URLs Found": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Insert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No URLs Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch Insert": {
+      "main": [
+        [
+          {
+            "node": "Insert Article URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Article URLs": {
+      "main": [
+        [
+          {
+            "node": "Get Processed IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Processed IDs": {
+      "main": [
+        [
+          {
+            "node": "Mark Pages Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Pages Processed": {
+      "main": [
+        [
+          {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log No URLs Found": {
+      "main": [
+        [
+          {
+            "node": "Warning Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-11-06T00:00:00.000Z",
+  "versionId": "1"
+}
