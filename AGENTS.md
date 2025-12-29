@@ -3,9 +3,9 @@
 ## Project Structure & Module Organization
 This repo is an n8n workflow automation project with supporting specs and database schema.
 
-- Workflow exports (JSON): `workflows/scraper-hourly-collection.json`, `workflows/link-extractor.json`, `workflows/cleanup-raw-html.json`, `workflows/test-supabase-connection.json`.
+- Workflow exports (JSON): `workflows/scraper-hourly-collection.json`, `workflows/link-extractor.json`, `workflows/cleanup-raw-html.json`, `workflows/test-supabase-connection.json`, `workflows/manual-intake.json`.
 - Database schema: `db/supabase-schema.sql` (tables for articles, posts, metrics).
-- Guides and specs: `docs/SETUP-GUIDE.md`, `docs/scraper-workflow-quick-start.md`, `docs/slovak-gossip-automation-spec (1).md`, `docs/implementation-plan.md`, `docs/todo.md`.
+- Guides and specs: `docs/SETUP-GUIDE.md`, `docs/scraper-workflow-quick-start.md`, `docs/slovak-gossip-automation-spec (1).md`, `docs/implementation-plan.md`, `docs/todo.md`, `docs/manual-intake.md`.
 - Agent/n8n guidance: `CLAUDE.md` and `n8n-skills/` (reference only).
 
 ## Build, Test, and Development Commands
