@@ -3,7 +3,7 @@
 
 -- ============================================================
 -- TABLE 1: articles
--- Stores scraped articles with scores and format assignments
+-- Stores ingested articles (manual uploads or scraping) with scores and format assignments
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS articles (
@@ -36,10 +36,10 @@ CREATE INDEX IF NOT EXISTS idx_articles_source_website
   ON articles(source_website);
 
 -- Comments for documentation
-COMMENT ON TABLE articles IS 'Stores scraped celebrity news articles from Slovak websites';
-COMMENT ON COLUMN articles.source_url IS 'Original article URL (UNIQUE constraint prevents duplicates)';
-COMMENT ON COLUMN articles.source_website IS 'Website name (topky.sk, cas.sk, pluska.sk, refresher.sk, startitup.sk)';
-COMMENT ON COLUMN articles.raw_html IS 'Raw HTML content (50k-100k tokens) for extraction';
+COMMENT ON TABLE articles IS 'Stores ingested content (manual uploads or scraped pages)';
+COMMENT ON COLUMN articles.source_url IS 'Original URL or manual identifier (UNIQUE constraint prevents duplicates)';
+COMMENT ON COLUMN articles.source_website IS 'Origin tag (manual or website domain)';
+COMMENT ON COLUMN articles.raw_html IS 'Raw HTML or extracted text for extraction';
 COMMENT ON COLUMN articles.summary IS 'GPT-5 Nano extracted summary (~500 tokens)';
 COMMENT ON COLUMN articles.judge_score IS 'First Judge score (1-10, NULL if not scored yet)';
 COMMENT ON COLUMN articles.format_assignments IS 'JSONB array of assigned formats: ["headline", "carousel", "video", "podcast"]';

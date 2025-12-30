@@ -1,4 +1,6 @@
-# Slovak Celebrity Gossip - Task List
+# Content Automation - Task List (Python)
+Update Notice (2025-12-30): Python-first (FastAPI + worker). n8n tasks below are legacy reference only.
+
 
 ## Legend
 - [ ] Not Started
@@ -16,12 +18,57 @@
 - ✅ **Infrastructure** - n8n + Supabase + API ready
 
 ### In Progress
-- 🚀 **Phase 1: Data Collection Pipeline** - Ready to start!
+- 🚀 **Phase 1: Intake API** - In progress
 
 ### Timeline
 - **Started**: 2025-11-03
 - **Phase 0 Completed**: 2025-11-03
-- **Current Status**: Ready to build production workflows
+- **Current Status**: Building Python API + worker
+
+---
+
+## Python Implementation (MVP)
+
+### Phase 0: Setup
+- [ ] Create `.venv` and install `requirements.txt`
+- [ ] Set `SUPABASE_URL`, `SUPABASE_KEY`, `OPENAI_API_KEY`
+- [ ] Run SQL schema `db/supabase-schema.sql`
+- [ ] Verify tables exist in Supabase
+
+### Phase 1: Intake API
+- [ ] Run `uvicorn app.main:app --reload --port 8000`
+- [ ] Test `/health`
+- [ ] Test `/intake/text` (JSON)
+- [ ] Test `/intake/file` (PDF/DOCX/TXT)
+- [ ] Confirm rows inserted into `articles`
+
+### Phase 2: Scraper Worker
+- [ ] Run `python -m app.worker scrape`
+- [ ] Verify category pages inserted in `articles`
+- [ ] Run `python -m app.worker scrape-loop --interval 3600`
+- [ ] Add/adjust scrape sources list
+
+### Phase 3: AI Pipeline (Planned)
+- [ ] Build extractor worker (HTML/text -> summary)
+- [ ] Build first judge worker (score + format assignments)
+- [ ] Build generator worker (multi-format outputs)
+- [ ] Build second judge worker (best selection)
+
+### Phase 4: Publishing (Planned)
+- [ ] Define platforms + credentials
+- [ ] Build posting workers (rate-limited)
+
+### Phase 5: Monitoring (Planned)
+- [ ] Add logging + basic metrics
+- [ ] Add error alerts (email/Discord)
+
+### Testing Checklist
+- [ ] Intake text: 2+ chunks created
+- [ ] Intake file: PDF extracts clean text
+- [ ] Scraper: handles 1+ source failure without crash
+- [ ] Database: no duplicate `source_url` inserts
+
+### Legacy: n8n Tasks (Reference Only)
 
 ---
 
@@ -93,8 +140,35 @@
 
 ---
 
-## Phase 1: Data Collection Pipeline (Week 1)
+## Phase 1: Manual Intake Pipeline (Week 1)
 
+### Sub-Workflow 1: Manual Intake (MVP)
+
+#### Discovery & Configuration
+- [ ] Review `docs/manual-intake.md` and `docs/manual-intake-quick-start.md`
+- [ ] Verify dependencies on the n8n host: `pdfplumber`, `python-docx`
+
+#### Build & Configure
+- [ ] Import `workflows/manual-intake.json`
+- [ ] Configure Supabase credentials on all nodes
+- [ ] Verify `source_website` is set to `manual`
+- [ ] Verify `raw_html` stores extracted plain text
+
+#### Testing
+- [ ] Test pasted text via webhook (JSON)
+- [ ] Test file upload (PDF, DOCX, TXT)
+- [ ] Confirm rows inserted into `articles`
+- [ ] Confirm chunking by chapter or 2500-word parts
+
+#### Success Criteria
+- [ ] Upload or paste creates rows in `articles`
+- [ ] Downstream extraction and judging workflows run unchanged
+
+---
+
+### Deferred: Web Scraping Pipeline (Future Phase)
+
+The scraping tasks below are deferred and should not be built for the MVP.
 ### Sub-Workflow 1A: "Scraper - Hourly Data Collection"
 
 #### Discovery & Configuration
@@ -852,6 +926,7 @@
 
 ---
 
-*Last Updated: 2025-11-03 13:45 UTC*
+*Last Updated: 2025-12-30*
 *Total Tasks: 389 (23 completed, 366 remaining)*
 *Current Phase: Phase 1 - Data Collection Pipeline*
+

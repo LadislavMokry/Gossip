@@ -1,10 +1,10 @@
-# Slovak Celebrity Gossip Content Automation System
+# Content Automation System (Manual Intake First)
 ## Technical Specification Document (MVP)
 
 **Version:** 1.0  
-**Last Updated:** October 16, 2025  
-**Target Platform:** n8n Workflow Automation  
-**Content Language:** Slovak  
+**Last Updated:** December 30, 2025
+**Target Platform:** Python (FastAPI + worker scripts)
+**Content Language:** Configurable (default Slovak)
 
 ---
 
@@ -14,24 +14,27 @@
 2. [System Components](#system-components)
 3. [Component Details](#component-details)
 4. [Configuration & Settings](#configuration--settings)
-5. [Error Handling & Monitoring](#error-handling--monitoring)
-6. [Cost Estimates](#cost-estimates)
-7. [Implementation Notes](#implementation-notes)
+5. [Testing](#testing)
+6. [Error Handling & Monitoring](#error-handling--monitoring)
+7. [Cost Estimates](#cost-estimates)
+8. [Implementation Notes](#implementation-notes)
 
 ---
 
 ## Overview & Architecture
+Update Notice (2025-12-30): Implementation is Python-first. n8n workflow references are legacy.
 
 ### Project Goal
-Automated content generation and publishing system for Slovak celebrity/gossip news across multiple social media platforms (Instagram, Facebook, TikTok, YouTube).
+Automated content generation and publishing system for uploaded text (PDF/DOCX/TXT or pasted text) plus web scraping, across multiple social media platforms (Instagram, Facebook, TikTok, YouTube). The MVP is topic-agnostic.
 
 ### High-Level Workflow
 ```
-Scraping (hourly) → Extraction (condense) → Storage (Supabase) → 
-First Judge (score & assign formats) → Content Generation (multi-model) → 
-Second Judge (pick best) → Media Creation → Publishing (rate-limited) → 
-Performance Tracking (feedback loop)
+Manual Intake (upload/paste) → Storage (Supabase) →
+Scraping (category pages) → Storage (Supabase) →
+Extraction (condense) → First Judge → Content Generation →
+Second Judge → Media Creation → Publishing → Performance Tracking
 ```
+Scraping and manual intake both feed the same downstream pipeline.
 
 ### Key Principles
 - **Modular design**: Easy to swap sources, models, and platforms
@@ -43,10 +46,15 @@ Performance Tracking (feedback loop)
 
 ## System Components
 
-### 1. Data Collection Module
-**Purpose:** Scrape Slovak celebrity news websites hourly  
-**Input:** URLs of target websites  
-**Output:** Raw article HTML/RSS data  
+### 1. Ingestion Module (Manual Intake)
+**Purpose:** Ingest uploaded text (PDF/DOCX/TXT or pasted text) into the database
+**Input:** Uploaded files or pasted text
+**Output:** Plain text chunks stored as article rows
+
+### 1B. Data Collection Module (Scraping)
+**Purpose:** Scrape category pages and store raw HTML for link extraction.
+**Input:** Source URLs
+**Output:** Raw HTML stored in `articles` (or a dedicated table if added later)
 
 ### 2. Storage & Deduplication Module
 **Purpose:** Store articles in database, prevent duplicate processing  
@@ -84,17 +92,50 @@ Performance Tracking (feedback loop)
 **Output:** Posted content across platforms  
 
 ### 9. Performance Tracking Module
-**Purpose:** Measure engagement, feed data back to judges  
-**Input:** Posted content IDs  
-**Output:** Metrics stored in database  
+**Purpose:** Measure engagement, feed data back to judges
+**Input:** Posted content IDs
+**Output:** Metrics stored in database
+
+---
+
+## Testing
+
+### Intake API
+- `/health` returns `{"status":"ok"}`
+- `/intake/text` inserts 1+ rows into `articles`
+- `/intake/file` extracts PDF/DOCX/TXT and inserts 1+ rows
+
+### Scraping
+- `python -m app.worker scrape` inserts raw HTML rows
+- One failing source does not stop the job
+
+### Database
+- `source_url` unique constraint prevents duplicates
+- `processed` and `scored` defaults are `false`
 
 ---
 
 ## Component Details
 
-## 1. Data Collection Module
+## 1. Ingestion Module (Manual Intake)
 
-### Source Websites (MVP - Celebrity/Gossip Focus)
+### Inputs Supported
+- Uploaded files: PDF, DOCX, TXT
+- Pasted text via JSON
+
+### Behavior
+- Extract text and split by headings (Chapter/Kapitola/Part/Book)
+- If no headings, chunk to ~2500 words
+- Insert each chunk into `articles` with `source_website = "manual"`
+
+### Notes
+- `raw_html` stores extracted plain text (schema compatibility)
+- Text-based PDFs work best; scanned PDFs require OCR (not included)
+
+---
+## 1B. Data Collection Module (Deferred: Web Scraping)
+
+### Source Websites (Deferred - Celebrity/Gossip Focus)
 - https://www.topky.sk/
 - https://www.cas.sk/
 - https://www1.pluska.sk/
@@ -2775,3 +2816,4 @@ For questions about this specification:
 **End of Technical Specification**
 
 *Version 1.0 - October 16, 2025*
+

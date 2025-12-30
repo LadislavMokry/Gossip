@@ -1,4 +1,6 @@
-# Setup Guide - Supabase Connection Testing
+# Setup Guide - Supabase + Python API
+Update Notice (2025-12-30): The project now uses a Python-first architecture (FastAPI + worker). n8n instructions below are legacy reference only.
+See `docs/python-spec.md` and `docs/python-todo.md` for the current plan.
 
 ## Step 1: Identify Which Keys to Use
 
@@ -75,7 +77,33 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # Keep this VERY secure
 
 ---
 
-## Step 4: Test Connection in n8n
+## Step 4: Test Connection (Python API)
+
+### **Start the API**
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+### **Health Check**
+```bash
+curl http://localhost:8000/health
+```
+Expected:
+```json
+{"status":"ok"}
+```
+
+### **Test Intake (Text)**
+```bash
+curl -X POST http://localhost:8000/intake/text \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Sample","text":"Chapter 1\nHello"}'
+```
+
+---
+
+## Legacy: Test Connection in n8n
 
 ### **Method 1: Manual Test in n8n UI**
 
@@ -313,12 +341,10 @@ Once you've verified:
 
 **You're ready to build the first workflow!**
 
-I'll create:
-1. **Sub-Workflow 1A: Scraper** (scrapes 5 Slovak news sites)
-2. **Sub-Workflow 1B: Extraction** (GPT-5 Nano summarization)
-3. **Sub-Workflow 1C: First Judge** (scoring + format assignment)
-
-Let me know when your tests pass and I'll start building! 🚀
+Next, run:
+1. **API Intake** (FastAPI) for manual uploads/paste
+2. **Scraper Worker** (Python) for category pages
+3. **AI Workers** (planned) for extraction/judging/generation
 
 ---
 
@@ -355,4 +381,4 @@ Let me know when your tests pass and I'll start building! 🚀
 
 ---
 
-*Last Updated: 2025-11-03*
+*Last Updated: 2025-12-30*

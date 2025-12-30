@@ -1,8 +1,10 @@
 # Sub-Workflow 1A: Scraper - Quick Start Guide
 
-**Last Updated**: 2025-11-03
+**Last Updated**: 2025-12-30
 **Est. Build Time**: 1-2 hours
 **Difficulty**: Beginner-Intermediate
+
+Note: This workflow is deprecated. Scraping now runs via Python worker (`python -m app.worker scrape`). The MVP uses manual intake (upload/paste text) as the primary ingestion path. See `docs/manual-intake-quick-start.md`.
 
 ---
 

@@ -1,12 +1,15 @@
-# Slovak Celebrity Gossip Content Automation - Implementation Plan
+# Content Automation - Implementation Plan (Manual Intake First)
 
 ## Project Overview
 
-This is the implementation roadmap for building a Slovak Celebrity Gossip Content Automation System using n8n workflow automation. The system scrapes Slovak celebrity news, generates multi-format social media content using AI, and publishes to Instagram, Facebook, TikTok, and YouTube.
+This is the implementation roadmap for building a content automation system using Python (FastAPI + worker scripts). The MVP focuses on manual intake (uploaded PDF/DOCX/TXT or pasted text) and runs the same downstream AI pipeline. Web scraping remains a deferred phase.
 
-**Target Platform**: n8n workflow automation (local instance at http://localhost:5678)
-**Content Language**: Slovak
-**Architecture**: Modular sub-workflow pipeline with 9 main components
+Update Notice (2025-12-30): Manual intake is the primary ingestion path. Scraping workflows are kept for later and marked as deferred.
+Update Notice (2025-12-30): Implementation is now Python-first (FastAPI + worker). n8n workflows are legacy reference only.
+
+**Target Platform**: Python (FastAPI intake API + worker scripts)
+**Content Language**: Configurable (default Slovak)
+**Architecture**: Modular pipeline (API + workers) with 9 main components
 **Cost Target**: ~$4.30/day for AI/ML operations
 
 ---
@@ -17,32 +20,30 @@ This is the implementation roadmap for building a Slovak Celebrity Gossip Conten
 - 9 distinct components with clear boundaries
 - Easier testing, debugging, and iteration
 - Independent deployment and validation
-- Matches n8n best practices (use "Execute Workflow" nodes)
 - Average 56 seconds between edits suggests incremental development works best
 
 ### Architecture Overview
 
 ```
 Main Orchestrator Workflow
-├─ Sub-workflow 1A: Data Collection (hourly scraping - 5 Slovak sites) ✅
-├─ Sub-workflow 1B: Link Extraction (extract article URLs from category pages)
-├─ Sub-workflow 1C: Article Scraping (fetch individual article content)
-├─ Sub-workflow 2: Extraction (GPT-5 Nano summarization)
-├─ Sub-workflow 3: First Judge (scoring 1-10, format assignment)
-├─ Sub-workflow 4: Content Generation (3 models in parallel)
-├─ Sub-workflow 5: Second Judge (best version selection)
-├─ Sub-workflow 6A: Media Creation - Images
-├─ Sub-workflow 6B: Media Creation - Videos
-├─ Sub-workflow 6C: Media Creation - Podcasts
-├─ Sub-workflow 7: Publishing (rate-limited, 6 windows/day)
-└─ Sub-workflow 8: Performance Tracking (1hr/6hr/24hr checkpoints)
+- Sub-workflow 1: Manual Intake (upload/paste text; PDF/DOCX/TXT)
+- Sub-workflow 2: Extraction (GPT-5 Nano summarization)
+- Sub-workflow 3: First Judge (scoring 1-10, format assignment)
+- Sub-workflow 4: Content Generation (3 models in parallel)
+- Sub-workflow 5: Second Judge (best version selection)
+- Sub-workflow 6A: Media Creation - Images
+- Sub-workflow 6B: Media Creation - Videos
+- Sub-workflow 6C: Media Creation - Podcasts
+- Sub-workflow 7: Publishing (rate-limited, 6 windows/day)
+- Sub-workflow 8: Performance Tracking (1hr/6hr/24hr checkpoints)
+- Deferred: Web Scraping pipeline (hourly collection, link extraction, article scraping)
 ```
 
 ---
 
 ## Phase 0: Initial Setup
 
-### Status: In Progress
+### Status: In Progress (Manual Intake)
 
 ### 1. Supabase Database Setup
 
@@ -51,12 +52,12 @@ Main Orchestrator Workflow
 - [ ] Create new project (select closest region to Slovakia)
 - [ ] Run database schema SQL (see below)
 - [ ] Get `SUPABASE_URL` and `SUPABASE_KEY` from Settings → API
-- [ ] Test connection from n8n
+- [ ] Test connection from API
 
 **Database Schema** (4 tables):
 
 #### Table 1: `articles`
-Stores scraped articles with scores and format assignments.
+Stores ingested articles with scores and format assignments.
 
 ```sql
 CREATE TABLE articles (
@@ -163,16 +164,13 @@ CREATE INDEX idx_model_performance_wins ON model_performance(judge_wins DESC);
 
 **Update .env.local**:
 ```bash
-# Existing
-N8N_API_KEY=your_n8n_key
-
 # Add Phase 1 Keys
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_anon_key
 OPENAI_API_KEY=sk-...
 ```
 
-### 3. n8n MCP Configuration
+### 3. Legacy: n8n MCP Configuration
 
 **Verify MCP Connection**:
 - [ ] Test n8n-mcp tools are available
@@ -181,10 +179,39 @@ OPENAI_API_KEY=sk-...
 
 ---
 
-## Phase 1: Data Collection Pipeline (Week 1)
+## Phase 1: Manual Intake Pipeline (Week 1)
 
-### Status: In Progress (1A Complete)
+### Status: In Progress (Manual Intake)
 
+### Sub-Workflow 1: "Manual Intake - Upload/Paste" (MVP)
+
+**Purpose**: Ingest uploaded PDFs/DOCX/TXT or pasted text into the `articles` table so the downstream pipeline runs unchanged.
+
+**What It Does**:
+- Accepts multipart file uploads or JSON text payloads via webhook
+- Extracts text (PDF/DOCX/TXT) and splits into chapters/parts
+- Inserts each part as a row in `articles` with `source_website = "manual"`
+
+**Nodes**:
+1. **Webhook** - Receive JSON or multipart form-data
+2. **IF** - Branch: file upload vs pasted text
+3. **Execute Command / Code** - Extract text and split into chapters/chunks
+4. **Supabase Insert** - Store rows in `articles`
+
+**File Location**: `workflows/manual-intake.json`
+**Docs**: `docs/manual-intake.md`
+**Dependencies**: `pdfplumber`, `python-docx` on the API host
+
+**Success Criteria**:
+- [ ] Upload or paste creates rows in `articles`
+- [ ] Text is split into sensible parts
+- [ ] Downstream extraction/judge workflows run unchanged
+
+---
+
+### Deferred: Web Scraping Pipeline (Future Phase)
+
+The scraping workflows below are kept for later. Do not build or activate them for the MVP.
 ### Sub-Workflow 1A: "Scraper - Hourly Data Collection" ✅ COMPLETED
 
 **Purpose**: Scrapes 5 Slovak celebrity news CATEGORY PAGES every hour
@@ -891,7 +918,7 @@ return [{json: { engagement_rate: engagement_rate.toFixed(2) }}];
 
 ---
 
-## Development Workflow (Per Sub-Workflow)
+## Legacy: n8n MCP Development Workflow (Reference Only)
 
 ### Step-by-Step Process:
 1. **Discover** - Search for relevant nodes (`search_nodes`, `search_templates`)
@@ -913,12 +940,12 @@ return [{json: { engagement_rate: engagement_rate.toFixed(2) }}];
 
 ## Key Tools & Skills
 
-### Primary n8n-MCP Tools:
+### Legacy n8n-MCP Tools:
 - `search_nodes` / `get_node_essentials` - Node discovery and configuration
 - `validate_node_operation` / `validate_workflow` - Validation
 - `n8n_create_workflow` / `n8n_update_partial_workflow` - Deployment
 
-### Primary n8n-Skills:
+### Legacy n8n-Skills:
 - **n8n-mcp-tools-expert** - Tool usage guidance
 - **n8n-workflow-patterns** - Architecture patterns
 - **n8n-validation-expert** - Error fixing
@@ -940,8 +967,7 @@ return [{json: { engagement_rate: engagement_rate.toFixed(2) }}];
 - Don't build monolithic workflow (use sub-workflows)
 - Don't skip validation steps
 - Don't forget queue-based strictness logic
-- Don't hardcode credentials (use n8n credentials system)
-- Don't manually activate workflows (n8n-mcp cannot activate, use UI)
+- Don't hardcode credentials (use environment variables)
 
 ---
 
@@ -961,7 +987,7 @@ From spec (~$4.30/day target):
 ## Estimated Timeline
 
 - **Phase 0 (Setup)**: 1-2 hours
-- **Phase 1 (Data Collection)**: 1-2 days
+- **Phase 1 (Manual Intake)**: 1-2 days
 - **Phase 2 (Content Generation)**: 3-4 days
 - **Phase 3 (Media Creation)**: 5-7 days
 - **Phase 4 (Publishing)**: 3-4 days
@@ -985,11 +1011,13 @@ From spec (~$4.30/day target):
 ## Next Steps
 
 1. Complete Phase 0 setup (Supabase + API keys)
-2. Build Sub-Workflow 1A (Scraper) - Simplest component, no LLM
-3. Build Sub-Workflow 1B (Extraction) - Test GPT-5 Nano + prompt caching
-4. Build Sub-Workflow 1C (First Judge) - Test queue-based logic
-5. Iterate through remaining phases
+2. Build Sub-Workflow 1 (Manual Intake) - Upload/paste text into `articles`
+3. Build Sub-Workflow 2 (Extraction) - Test GPT-5 Nano + prompt caching
+4. Build Sub-Workflow 3 (First Judge) - Test queue-based logic
+5. Iterate through remaining phases (scraping deferred)
 
 ---
 
-*Last Updated: 2025-11-03*
+*Last Updated: 2025-12-30*
+
+
