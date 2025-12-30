@@ -12,6 +12,19 @@ Update Notice (2025-12-30): Python-first (FastAPI + worker). n8n tasks below are
 
 ## 📊 Progress Summary
 
+### Handoff Notes (2025-12-30)
+- Python-first pipeline is working (FastAPI + worker). Manual intake endpoints and scraping pipeline tested end-to-end.
+- Scraper link extraction rules were fixed for all 5 Slovak sources. Current extraction flow: scrape category_pages -> extract hrefs -> article_urls -> scrape articles.
+- Latest verified flow (after reset): `scrape` -> `extract-links` -> `scrape-articles` returns 47 links total and 47 articles scraped (scrape-articles has a 20-per-run limit).
+- If article scraping seems incomplete, re-run `python -m app.worker scrape-articles` until it returns 0.
+- If counts seem off, reset with:
+  - `delete from article_urls;`
+  - `update category_pages set processed = false;`
+- Supabase check queries used:
+  - `select count(*) from article_urls where scraped = false;`
+  - `select source_website, count(*) from article_urls group by source_website;`
+  - `select source_website, count(*) from articles group by source_website;`
+
 ### Completed
 - ✅ **Phase 0: Initial Setup** - 100% Complete
 - ✅ **Test Workflow** - Validated & Working
