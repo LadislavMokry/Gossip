@@ -6,6 +6,7 @@ This is the implementation roadmap for building a content automation system usin
 
 Update Notice (2025-12-30): Manual intake is the primary ingestion path. Scraping workflows are kept for later and marked as deferred.
 Update Notice (2025-12-30): Implementation is now Python-first (FastAPI + worker). n8n workflows are legacy reference only.
+Update Notice (2026-01-05): Video-first scope (shorts + audio roundup). Multi-format outputs deferred; generation uses full content; second judge selects best variant.
 
 **Target Platform**: Python (FastAPI intake API + worker scripts)
 **Content Language**: Configurable (default Slovak)
@@ -433,7 +434,7 @@ CREATE INDEX idx_article_urls_website ON article_urls(source_website);
 
 ### Sub-Workflow 3: "First Judge - Scoring & Format Assignment"
 
-**Purpose**: Scores articles 1-10, assigns content formats based on quality and queue size
+**Purpose**: Scores articles 1-10, sets video-only gate (score >= 6)
 
 **Nodes**:
 1. **Schedule Trigger** - Every 15 minutes
@@ -458,9 +459,8 @@ return [{json: {minScore}}];
 8. **Supabase Update (False Branch)** - Mark `scored = TRUE`, `judge_score = 0` (rejected)
 
 **Format Assignment Logic**:
-- **Score 8-10**: `["podcast", "video", "carousel", "headline"]`
-- **Score 6-7**: `["carousel", "headline"]`
-- **Score 4-5**: `["headline"]`
+- **Score >= 6**: `["video"]`
+- **Score < 6**: `[]`
 - **Score 1-3**: `[]` (skip)
 
 **API Keys Required**: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`
@@ -485,7 +485,8 @@ return [{json: {minScore}}];
 
 ### Sub-Workflow 4: "Content Generator - Multi-Model Generation"
 
-**Purpose**: 3 AI models (GPT-5 Mini, Claude Haiku 4.5, Gemini 2.5 Flash) each generate ALL assigned formats in ONE call
+**Purpose**: Generate video-only outputs from full article content.
+Update (2026-01-05): run 3 variants per article (same model), then second judge selects the best variant.
 
 **Nodes**:
 1. **Schedule Trigger** - Every 20 minutes

@@ -15,6 +15,20 @@ class OpenAIClient:
         self._base_url = settings.openai_base_url.rstrip("/")
         self._timeout = settings.request_timeout
 
+    def _supports_temperature(self, model: str) -> bool:
+        return not model.startswith("gpt-5")
+
+    def _default_reasoning_effort(self, model: str) -> str | None:
+        if model.startswith("gpt-5"):
+            return "minimal"
+        return None
+
+    def _supports_reasoning_effort(self, model: str) -> bool:
+        return model.startswith("gpt-5")
+
+    def _max_tokens_param(self, model: str) -> str:
+        return "max_completion_tokens" if model.startswith("gpt-5") else "max_tokens"
+
     def _headers(self) -> dict:
         return {
             "Authorization": f"Bearer {self._api_key}",
@@ -28,6 +42,7 @@ class OpenAIClient:
         user: str,
         temperature: float = 0.2,
         max_tokens: int = 800,
+        reasoning_effort: str | None = None,
     ) -> dict:
         payload = {
             "model": model,
@@ -35,18 +50,26 @@ class OpenAIClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
+            self._max_tokens_param(model): max_tokens,
             "response_format": {"type": "json_object"},
         }
+        if self._supports_temperature(model):
+            payload["temperature"] = temperature
+        effort = reasoning_effort or self._default_reasoning_effort(model)
+        if effort and self._supports_reasoning_effort(model):
+            payload["reasoning_effort"] = effort
         resp = requests.post(
             f"{self._base_url}/chat/completions",
             headers=self._headers(),
             json=payload,
             timeout=self._timeout,
         )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
+        if not resp.ok:
+            raise RuntimeError(f"OpenAI error {resp.status_code}: {resp.text}")
+        data = resp.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not str(content).strip():
+            raise RuntimeError(f"OpenAI returned empty content: {data}")
         return _parse_json(content)
 
     def chat_text(
@@ -56,6 +79,7 @@ class OpenAIClient:
         user: str,
         temperature: float = 0.6,
         max_tokens: int = 800,
+        reasoning_effort: str | None = None,
     ) -> str:
         payload = {
             "model": model,
@@ -63,17 +87,26 @@ class OpenAIClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
+            self._max_tokens_param(model): max_tokens,
         }
+        if self._supports_temperature(model):
+            payload["temperature"] = temperature
+        effort = reasoning_effort or self._default_reasoning_effort(model)
+        if effort and self._supports_reasoning_effort(model):
+            payload["reasoning_effort"] = effort
         resp = requests.post(
             f"{self._base_url}/chat/completions",
             headers=self._headers(),
             json=payload,
             timeout=self._timeout,
         )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        if not resp.ok:
+            raise RuntimeError(f"OpenAI error {resp.status_code}: {resp.text}")
+        data = resp.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not str(content).strip():
+            raise RuntimeError(f"OpenAI returned empty content: {data}")
+        return content
 
     def tts(self, model: str, voice: str, text: str) -> bytes:
         payload = {"model": model, "voice": voice, "input": text}

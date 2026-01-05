@@ -2,9 +2,10 @@
 ## Technical Specification Document (MVP)
 
 **Version:** 1.0  
-**Last Updated:** December 30, 2025
+**Last Updated:** January 5, 2026
 **Target Platform:** Python (FastAPI + worker scripts)
 **Content Language:** Configurable (default Slovak)
+**Scope Update (2026-01-05):** Video-first outputs (shorts + audio roundup). Multi-format outputs deferred; generation uses full content; second judge selects best variant.
 
 ---
 

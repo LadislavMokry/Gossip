@@ -1,12 +1,13 @@
 # Python Architecture Overview
-**Last Updated:** 2025-12-30
+**Last Updated:** 2026-01-05
 
 ## Summary
-This project now uses a Python-first architecture:
+This project uses a Python-first architecture:
 - **FastAPI** for intake (text + file uploads)
-- **Worker scripts** for scraping and scheduled jobs
+- **Worker scripts** for scraping, extraction, judging, and generation
 - **Supabase** for storage
-- **AI APIs** for extraction/judging/generation (planned)
+- **AI APIs** for summaries/judging + media generation
+- **Video-first outputs** (short-form video + optional audio roundup)
 
 ---
 
@@ -24,7 +25,7 @@ This project now uses a Python-first architecture:
 ---
 
 ### 2) Scraper Worker
-**Purpose**: Fetch category pages and insert into `articles`.
+**Purpose**: Fetch category pages, extract article URLs, and store article HTML.
 
 **Code**
 - `app/scrape.py`
@@ -40,17 +41,19 @@ python -m app.worker extract
 python -m app.worker judge
 python -m app.worker generate
 python -m app.worker second-judge
+python -m app.worker audio-roundup
 ```
 
 ---
 
-### 3) AI Workers (Planned)
-**Purpose**: Summarize, score, generate content.
+### 3) AI Workers
+**Purpose**: Summarize, score, generate content, and pick best variants.
 
-**Planned modules**
-- `app/ai/extract.py`
-- `app/ai/judge.py`
-- `app/ai/generate.py`
+**Modules**
+- `app/ai/extract.py` (trafilatura + summary)
+- `app/ai/first_judge.py`
+- `app/ai/generate.py` (video-only output)
+- `app/ai/second_judge.py`
 
 ---
 
@@ -79,3 +82,8 @@ uvicorn app.main:app --reload --port 8000
 - `MANUAL_INTAKE_DIR` (optional temp dir override)
 - `MAX_WORDS` (default 2500)
 - `REQUEST_TIMEOUT` (default 30)
+- `EXTRACTION_MAX_CHARS` (default 20000)
+- `EXTRACTION_USE_LLM` (default true; fallback summary if false)
+- `EXTRACTION_MODEL`, `JUDGE_MODEL`, `SECOND_JUDGE_MODEL`, `GENERATION_MODELS`
+- `TTS_MODEL`, `ASR_MODEL`, `IMAGE_MODEL`
+- `ENABLE_TTS`, `ENABLE_ASR`, `ENABLE_IMAGE_GENERATION`

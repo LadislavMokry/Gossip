@@ -1,6 +1,14 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from functools import lru_cache
 from pydantic import BaseModel
+
+# Load .env.local or .env from repo root if present (do not override real env).
+_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(_ROOT / ".env.local", override=False)
+load_dotenv(_ROOT / ".env", override=False)
 
 
 class Settings(BaseModel):
@@ -12,6 +20,23 @@ class Settings(BaseModel):
     manual_intake_dir: str | None = None
     max_words: int = 2500
     request_timeout: int = 30
+    extraction_max_chars: int = 20000
+    extraction_use_llm: bool = True
+    extraction_model: str = "gpt-5-nano"
+    judge_model: str = "gpt-4.1-mini"
+    second_judge_model: str = "gpt-4.1-mini"
+    generation_models: list[str] = ["gpt-4.1-mini"]
+    generation_variants: int = 3
+    video_min_score: int = 6
+    audio_roundup_model: str = "gpt-5-mini"
+    audio_roundup_size: int = 5
+    audio_roundup_hours: int = 24
+    tts_model: str = "gpt-4o-mini-tts"
+    asr_model: str = "whisper-1"
+    image_model: str = "gpt-image-1"
+    enable_image_generation: bool = False
+    enable_tts: bool = False
+    enable_asr: bool = False
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -36,6 +61,9 @@ def get_settings() -> Settings:
         manual_intake_dir=os.environ.get("MANUAL_INTAKE_DIR"),
         max_words=int(os.environ.get("MAX_WORDS", "2500")),
         request_timeout=int(os.environ.get("REQUEST_TIMEOUT", "30")),
+        extraction_max_chars=int(os.environ.get("EXTRACTION_MAX_CHARS", "20000")),
+        extraction_use_llm=os.environ.get("EXTRACTION_USE_LLM", "true").lower()
+        in ("1", "true", "yes"),
         extraction_model=os.environ.get("EXTRACTION_MODEL", "gpt-5-nano"),
         judge_model=os.environ.get("JUDGE_MODEL", "gpt-4.1-mini"),
         second_judge_model=os.environ.get("SECOND_JUDGE_MODEL", "gpt-4.1-mini"),
@@ -44,6 +72,11 @@ def get_settings() -> Settings:
             for m in os.environ.get("GENERATION_MODELS", "gpt-4.1-mini").split(",")
             if m.strip()
         ],
+        generation_variants=int(os.environ.get("GENERATION_VARIANTS", "3")),
+        video_min_score=int(os.environ.get("VIDEO_MIN_SCORE", "6")),
+        audio_roundup_model=os.environ.get("AUDIO_ROUNDUP_MODEL", "gpt-5-mini"),
+        audio_roundup_size=int(os.environ.get("AUDIO_ROUNDUP_SIZE", "5")),
+        audio_roundup_hours=int(os.environ.get("AUDIO_ROUNDUP_HOURS", "24")),
         tts_model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts"),
         asr_model=os.environ.get("ASR_MODEL", "whisper-1"),
         image_model=os.environ.get("IMAGE_MODEL", "gpt-image-1"),
@@ -52,13 +85,3 @@ def get_settings() -> Settings:
         enable_tts=os.environ.get("ENABLE_TTS", "false").lower() in ("1", "true", "yes"),
         enable_asr=os.environ.get("ENABLE_ASR", "false").lower() in ("1", "true", "yes"),
     )
-    extraction_model: str = "gpt-5-nano"
-    judge_model: str = "gpt-4.1-mini"
-    second_judge_model: str = "gpt-4.1-mini"
-    generation_models: list[str] = ["gpt-4.1-mini"]
-    tts_model: str = "gpt-4o-mini-tts"
-    asr_model: str = "whisper-1"
-    image_model: str = "gpt-image-1"
-    enable_image_generation: bool = False
-    enable_tts: bool = False
-    enable_asr: bool = False

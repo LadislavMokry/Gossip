@@ -3,9 +3,8 @@ from app.config import get_settings
 
 
 SYSTEM_PROMPT = (
-    "You are a content judge. Score the content 1-10 and assign formats. "
-    "Return JSON with keys: score (int), formats (array of strings). "
-    "Formats allowed: headline, carousel, video, podcast."
+    "You are a content judge. Score the content 1-10 for viral potential. "
+    "Return JSON with key: score (int)."
 )
 
 
@@ -23,10 +22,6 @@ def judge_summary(summary: str) -> dict:
 
 
 def default_format_rules(score: int) -> list[str]:
-    if score >= 8:
-        return ["headline", "carousel", "video", "podcast"]
     if score >= 6:
-        return ["carousel", "headline"]
-    if score >= 4:
-        return ["headline"]
+        return ["video"]
     return []

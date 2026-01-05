@@ -1,5 +1,6 @@
 # Setup Guide - Supabase + Python API
 Update Notice (2025-12-30): The project now uses a Python-first architecture (FastAPI + worker). n8n instructions below are legacy reference only.
+Update Notice (2026-01-05): `.env` / `.env.local` are auto-loaded for Python workers; place OpenAI keys and model settings there.
 See `docs/python-spec.md` and `docs/python-todo.md` for the current plan.
 
 ## Step 1: Identify Which Keys to Use

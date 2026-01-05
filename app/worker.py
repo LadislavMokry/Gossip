@@ -1,7 +1,13 @@
 import argparse
 import time
 
-from .pipeline import run_extraction, run_first_judge, run_generation, run_second_judge
+from .pipeline import (
+    run_audio_roundup,
+    run_extraction,
+    run_first_judge,
+    run_generation,
+    run_second_judge,
+)
 from .scrape import (
     scrape_category_pages,
     upsert_category_pages,
@@ -36,6 +42,7 @@ def main() -> None:
     sub.add_parser("judge", help="Run first judge once")
     sub.add_parser("generate", help="Run generation once")
     sub.add_parser("second-judge", help="Run second judge once")
+    sub.add_parser("audio-roundup", help="Run audio roundup once")
 
     loop_parser = sub.add_parser("scrape-loop", help="Scrape on an interval")
     loop_parser.add_argument("--interval", type=int, default=3600, help="Seconds between runs")
@@ -87,6 +94,10 @@ def main() -> None:
     if args.command == "second-judge":
         count = run_second_judge()
         print(f"second_judged={count}")
+        return
+    if args.command == "audio-roundup":
+        count = run_audio_roundup()
+        print(f"audio_roundup={count}")
         return
 
     if args.command == "scrape-loop":

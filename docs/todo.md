@@ -1,5 +1,6 @@
 # Content Automation - Task List (Python)
 Update Notice (2025-12-30): Python-first (FastAPI + worker). n8n tasks below are legacy reference only.
+Update Notice (2026-01-05): Video-first scope (shorts + audio roundup). Multi-format outputs (headline/carousel/podcast) are deferred.
 
 
 ## Legend
@@ -16,6 +17,7 @@ Update Notice (2025-12-30): Python-first (FastAPI + worker). n8n tasks below are
 - Python-first pipeline is working (FastAPI + worker). Manual intake endpoints and scraping pipeline tested end-to-end.
 - Scraper link extraction rules were fixed for all 5 Slovak sources. Current extraction flow: scrape category_pages -> extract hrefs -> article_urls -> scrape articles.
 - Latest verified flow (after reset): `scrape` -> `extract-links` -> `scrape-articles` returns 47 links total and 47 articles scraped (scrape-articles has a 20-per-run limit).
+- Scope update (2026-01-05): prioritize video shorts + audio roundup; use full article content for generation; judge gate score>=6 for video.
 - If article scraping seems incomplete, re-run `python -m app.worker scrape-articles` until it returns 0.
 - If counts seem off, reset with:
   - `delete from article_urls;`
@@ -365,11 +367,9 @@ The scraping tasks below are deferred and should not be built for the MVP.
 - [ ] Test with queue size = 25 (minScore should be 5)
 - [ ] Test with queue size = 45 (minScore should be 6)
 - [ ] Test with queue size = 65 (minScore should be 7)
-- [ ] Verify format assignments match score ranges:
-  - Score 8-10: ["podcast", "video", "carousel", "headline"]
-  - Score 6-7: ["carousel", "headline"]
-  - Score 4-5: ["headline"]
-  - Score 1-3: []
+- [ ] Verify video-only gate:
+  - Score >= 6: ["video"]
+  - Score < 6: []
 - [ ] Check rejected articles marked correctly (scored = TRUE, judge_score = 0)
 - [ ] Activate workflow in n8n UI
 
@@ -385,6 +385,7 @@ The scraping tasks below are deferred and should not be built for the MVP.
 ## Phase 2: Content Generation (Week 2-3)
 
 ### Sub-Workflow 2: "Content Generator - Multi-Model Generation"
+Update (2026-01-05): video-only outputs; multi-format generation tasks below are deferred.
 
 #### Discovery & Configuration
 - [ ] Search for Anthropic node (Claude)

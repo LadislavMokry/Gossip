@@ -1,6 +1,13 @@
 # Python Content Automation - Task List (Deep)
-Last Updated: 2025-12-30
+Last Updated: 2026-01-05
 Target: Python (FastAPI + worker scripts)
+
+Update (2026-01-05):
+- Focus on video-first outputs (shorts) plus optional audio roundup.
+- Multi-format outputs (headline/carousel/podcast) are deferred.
+- Generation uses full article content; three variants per article.
+- Second judge selects best variant.
+- Extraction uses trafilatura; fallback summary when LLM fails or is disabled.
 
 ---
 
@@ -84,11 +91,13 @@ Phase 3: Extraction Worker (Planned)
 - [ ] Add app/ai/extract.py
 - [ ] Query articles where processed=false
 - [ ] Skip rows without raw_html
-- [ ] Call LLM to summarize
-- [ ] Store summary, content if extracted, processed=true
+- [ ] Use trafilatura to extract main content
+- [ ] Call LLM to summarize (optional)
+- [ ] Store content + summary, processed=true
 - [ ] Add retry on LLM errors (max retries)
 - [ ] Add token usage logging (if available)
 - [ ] Batch size config
+- [ ] Add fallback summary when LLM fails or is disabled
 
 Testing
 - [ ] Summaries generated for manual intake rows
@@ -100,7 +109,7 @@ Phase 4: First Judge (Planned)
 - [ ] Add app/ai/first_judge.py
 - [ ] Query articles where scored=false and processed=true
 - [ ] Score 1-10
-- [ ] Assign format_assignments based on score
+- [ ] Assign video-only gate (score >= 6 => ["video"], else [])
 - [ ] Store judge_score, format_assignments, scored=true
 - [ ] Queue size logic (optional)
 
@@ -111,10 +120,12 @@ Testing
 
 Phase 5: Generation (Planned)
 - [ ] Add app/ai/generate.py
-- [ ] Query articles with format_assignments != []
-- [ ] Generate all requested formats in one call per model
-- [ ] Insert outputs into posts (one row per model)
-- [ ] Store generating_model, content_type, content JSON
+- [ ] Query articles gated for video (score >= 6)
+- [ ] Use articles.content as input (not summary)
+- [ ] Generate video-only JSON (script + scenes + captions + duration)
+- [ ] Generate N variants per article (default 3) using same model
+- [ ] Insert outputs into posts (one row per variant)
+- [ ] Store generating_model, content_type = "video", content JSON
 
 Testing
 - [ ] 3 model outputs per article
@@ -122,10 +133,17 @@ Testing
 
 Phase 6: Second Judge (Planned)
 - [ ] Add app/ai/second_judge.py
-- [ ] Group posts by article and format
+- [ ] Group posts by article + content_type + variant_id
 - [ ] Select best version
 - [ ] Mark posts.selected=true for winners
 - [ ] Update model_performance
+
+Phase 6B: Audio Roundup (Planned)
+- [ ] Select top 5 articles in time window
+- [ ] Generate two-host dialogue (male + female)
+- [ ] Generate TTS for both voices
+- [ ] Assemble audio (3-5 minutes)
+- [ ] Optional: build visualizer video for YouTube
 
 Phase 7: Publishing (Planned)
 - [ ] Define platforms and credentials

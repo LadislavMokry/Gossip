@@ -3,16 +3,20 @@ from app.config import get_settings
 
 
 SYSTEM_PROMPT = (
-    "You are a judge selecting the best version. Return JSON with keys: winner, reasoning."
+    "You are a judge selecting the best variant. Return JSON with keys: "
+    "winner_variant, reasoning."
 )
 
 
 def pick_winner(format_name: str, versions: list[dict]) -> dict:
     settings = get_settings()
     if not versions:
-        return {"winner": None, "reasoning": "no versions"}
+        return {"winner_variant": None, "reasoning": "no versions"}
     if not settings.openai_api_key:
-        return {"winner": versions[0]["model"], "reasoning": "default first (no API key)"}
+        return {
+            "winner_variant": versions[0].get("variant_id"),
+            "reasoning": "default first (no API key)",
+        }
 
     client = OpenAIClient()
     user = {
@@ -25,4 +29,5 @@ def pick_winner(format_name: str, versions: list[dict]) -> dict:
         user=f"{user}\nReturn JSON.",
         temperature=0.2,
         max_tokens=400,
+        reasoning_effort="minimal",
     )

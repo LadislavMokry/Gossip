@@ -1,9 +1,9 @@
-import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
+from app.ai.audio_roundup import generate_audio_roundup
 from app.ai.extract import extract_summary
 from app.ai.first_judge import default_format_rules, judge_summary
-from app.ai.generate import generate_for_model, generation_models
+from app.ai.generate import generate_video_variant, generation_models
 from app.ai.second_judge import pick_winner
 from app.config import get_settings
 from app.db import get_supabase
@@ -25,15 +25,19 @@ def fetch_unprocessed(limit: int = 20) -> list[dict]:
     return resp.data or []
 
 
-def mark_processed(article_id: str, summary: str, title: str | None = None) -> None:
+def mark_processed(
+    article_id: str, summary: str, title: str | None = None, content: str | None = None
+) -> None:
     sb = get_supabase()
     update = {"summary": summary, "processed": True, "scraped_at": _now()}
     if title:
         update["title"] = title
+    if content:
+        update["content"] = content
     sb.table("articles").update(update).eq("id", article_id).execute()
 
 
-def run_extraction(limit: int = 20) -> int:
+def run_extraction(limit: int = 3) -> int:
     items = fetch_unprocessed(limit=limit)
     count = 0
     for item in items:
@@ -43,8 +47,9 @@ def run_extraction(limit: int = 20) -> int:
         result = extract_summary(raw)
         summary = result.get("summary") or ""
         title = result.get("title")
+        content = result.get("content")
         if summary:
-            mark_processed(item["id"], summary, title)
+            mark_processed(item["id"], summary, title, content)
             count += 1
     return count
 
@@ -74,6 +79,7 @@ def mark_scored(article_id: str, score: int, formats: list[str]) -> None:
 
 
 def run_first_judge(limit: int = 20) -> int:
+    settings = get_settings()
     items = fetch_unscored(limit=limit)
     count = 0
     for item in items:
@@ -82,26 +88,17 @@ def run_first_judge(limit: int = 20) -> int:
             continue
         result = judge_summary(summary)
         score = int(result.get("score", 0))
-        formats = result.get("formats") or default_format_rules(score)
+        formats = ["video"] if score >= settings.video_min_score else []
         mark_scored(item["id"], score, formats)
         count += 1
     return count
-
-
-def _format_platform_map() -> dict:
-    return {
-        "headline": "instagram",
-        "carousel": "instagram",
-        "video": "tiktok",
-        "podcast": "youtube",
-    }
 
 
 def fetch_ready_for_generation(limit: int = 10) -> list[dict]:
     sb = get_supabase()
     resp = (
         sb.table("articles")
-        .select("id, summary, format_assignments")
+        .select("id, content, judge_score")
         .eq("scored", True)
         .limit(limit)
         .execute()
@@ -109,53 +106,52 @@ def fetch_ready_for_generation(limit: int = 10) -> list[dict]:
     return resp.data or []
 
 
-def has_posts(article_id: str) -> bool:
+def has_video_posts(article_id: str) -> bool:
     sb = get_supabase()
-    resp = sb.table("posts").select("id").eq("article_id", article_id).limit(1).execute()
+    resp = (
+        sb.table("posts")
+        .select("id")
+        .eq("article_id", article_id)
+        .eq("content_type", "video")
+        .limit(1)
+        .execute()
+    )
     return bool(resp.data)
 
 
-def insert_posts(article_id: str, model: str, content: dict, formats: list[str]) -> int:
+def insert_video_post(article_id: str, model: str, content: dict) -> int:
     sb = get_supabase()
-    platform_map = _format_platform_map()
-    rows = []
-    for fmt in formats:
-        if fmt not in content:
-            continue
-        rows.append(
-            {
-                "article_id": article_id,
-                "platform": platform_map.get(fmt, "instagram"),
-                "content_type": fmt,
-                "generating_model": model,
-                "content": content.get(fmt),
-            }
-        )
-    if not rows:
-        return 0
-    resp = sb.table("posts").insert(rows).execute()
+    row = {
+        "article_id": article_id,
+        "platform": "tiktok",
+        "content_type": "video",
+        "generating_model": model,
+        "content": content,
+    }
+    resp = sb.table("posts").insert(row).execute()
     return len(resp.data or [])
 
 
 def run_generation(limit: int = 10) -> int:
+    settings = get_settings()
+    models = generation_models()
+    if not models:
+        return 0
+    model = models[0]
     items = fetch_ready_for_generation(limit=limit)
     count = 0
     for item in items:
-        if has_posts(item["id"]):
+        if has_video_posts(item["id"]):
             continue
-        summary = item.get("summary") or ""
-        formats = item.get("format_assignments") or []
-        # Supabase returns JSONB as list or string; normalize
-        if isinstance(formats, str):
-            try:
-                formats = json.loads(formats)
-            except json.JSONDecodeError:
-                formats = []
-        if not formats:
+        score = int(item.get("judge_score") or 0)
+        if score < settings.video_min_score:
             continue
-        for model in generation_models():
-            content = generate_for_model(summary, formats, model)
-            count += insert_posts(item["id"], model, content, formats)
+        content = (item.get("content") or "").strip()
+        if not content:
+            continue
+        for variant_id in range(1, settings.generation_variants + 1):
+            variant = generate_video_variant(content, model, variant_id)
+            count += insert_video_post(item["id"], model, variant)
     return count
 
 
@@ -165,6 +161,7 @@ def fetch_for_second_judge(limit: int = 20) -> list[dict]:
         sb.table("posts")
         .select("id, article_id, content_type, generating_model, content, selected")
         .eq("selected", False)
+        .eq("content_type", "video")
         .limit(limit)
         .execute()
     )
@@ -175,11 +172,23 @@ def group_versions(items: list[dict]) -> dict:
     grouped: dict = {}
     for item in items:
         key = (item["article_id"], item["content_type"])
+        content = item.get("content") or {}
+        if isinstance(content, str):
+            try:
+                import json
+
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                content = {}
+        variant_id = None
+        if isinstance(content, dict):
+            variant_id = content.get("variant_id")
         grouped.setdefault(key, []).append(
             {
                 "id": item["id"],
                 "model": item["generating_model"],
-                "content": item["content"],
+                "variant_id": variant_id,
+                "content": content,
             }
         )
     return grouped
@@ -208,9 +217,11 @@ def run_second_judge(limit: int = 20) -> int:
     count = 0
     for (article_id, fmt), versions in grouped.items():
         decision = pick_winner(fmt, versions)
-        winner_model = decision.get("winner")
-        # pick matching post id
-        winner_post = next((v for v in versions if v["model"] == winner_model), None)
+        winner_variant = decision.get("winner_variant") or decision.get("winner")
+        # pick matching post id by variant
+        winner_post = next(
+            (v for v in versions if v.get("variant_id") == winner_variant), None
+        )
         if not winner_post:
             winner_post = versions[0]
         mark_post_selected(winner_post["id"])
@@ -218,3 +229,47 @@ def run_second_judge(limit: int = 20) -> int:
             update_model_performance(v["model"], fmt, v["id"] == winner_post["id"])
         count += 1
     return count
+
+
+def fetch_for_audio_roundup(limit: int = 5, hours: int = 24) -> list[dict]:
+    sb = get_supabase()
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    resp = (
+        sb.table("articles")
+        .select("id, title, summary, judge_score, scraped_at")
+        .eq("processed", True)
+        .eq("scored", True)
+        .gte("scraped_at", since.isoformat())
+        .order("judge_score", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return resp.data or []
+
+
+def insert_audio_roundup(model: str, content: dict) -> int:
+    sb = get_supabase()
+    row = {
+        "article_id": None,
+        "platform": "youtube",
+        "content_type": "audio_roundup",
+        "generating_model": model,
+        "content": content,
+    }
+    resp = sb.table("posts").insert(row).execute()
+    return len(resp.data or [])
+
+
+def run_audio_roundup() -> int:
+    settings = get_settings()
+    items = fetch_for_audio_roundup(
+        limit=settings.audio_roundup_size, hours=settings.audio_roundup_hours
+    )
+    if not items:
+        return 0
+    stories = [
+        {"title": item.get("title"), "summary": item.get("summary")}
+        for item in items
+    ]
+    content = generate_audio_roundup(stories)
+    return insert_audio_roundup(settings.audio_roundup_model, content)

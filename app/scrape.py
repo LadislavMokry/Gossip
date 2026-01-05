@@ -130,6 +130,7 @@ def scrape_category_pages(sources: list[ScrapeSource] | None = None) -> list[dic
                 "source_url": source.url,
                 "source_website": source.name or _source_website(source.url),
                 "raw_html": resp.text,
+                "processed": False,
                 "scraped_at": datetime.now(timezone.utc).isoformat(),
             }
         )
