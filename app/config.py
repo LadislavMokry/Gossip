@@ -31,6 +31,10 @@ class Settings(BaseModel):
     audio_roundup_model: str = "gpt-5-mini"
     audio_roundup_size: int = 5
     audio_roundup_hours: int = 24
+    audio_roundup_voice_a: str = "onyx"
+    audio_roundup_voice_b: str = "nova"
+    media_output_dir: str = "media_out"
+    ffmpeg_path: str | None = None
     tts_model: str = "gpt-4o-mini-tts"
     asr_model: str = "whisper-1"
     image_model: str = "gpt-image-1"
@@ -77,6 +81,10 @@ def get_settings() -> Settings:
         audio_roundup_model=os.environ.get("AUDIO_ROUNDUP_MODEL", "gpt-5-mini"),
         audio_roundup_size=int(os.environ.get("AUDIO_ROUNDUP_SIZE", "5")),
         audio_roundup_hours=int(os.environ.get("AUDIO_ROUNDUP_HOURS", "24")),
+        audio_roundup_voice_a=os.environ.get("AUDIO_ROUNDUP_VOICE_A", "onyx"),
+        audio_roundup_voice_b=os.environ.get("AUDIO_ROUNDUP_VOICE_B", "nova"),
+        media_output_dir=os.environ.get("MEDIA_OUTPUT_DIR", "media_out"),
+        ffmpeg_path=os.environ.get("FFMPEG_PATH"),
         tts_model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts"),
         asr_model=os.environ.get("ASR_MODEL", "whisper-1"),
         image_model=os.environ.get("IMAGE_MODEL", "gpt-image-1"),

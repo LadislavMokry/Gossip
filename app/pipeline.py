@@ -273,3 +273,37 @@ def run_audio_roundup() -> int:
     ]
     content = generate_audio_roundup(stories)
     return insert_audio_roundup(settings.audio_roundup_model, content)
+
+
+def fetch_latest_audio_roundup() -> dict | None:
+    sb = get_supabase()
+    resp = (
+        sb.table("posts")
+        .select("id, content")
+        .eq("content_type", "audio_roundup")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    data = resp.data or []
+    return data[0] if data else None
+
+
+def fetch_latest_selected_video() -> dict | None:
+    sb = get_supabase()
+    resp = (
+        sb.table("posts")
+        .select("id, content")
+        .eq("content_type", "video")
+        .eq("selected", True)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    data = resp.data or []
+    return data[0] if data else None
+
+
+def update_post_media(post_id: str, media_url: str) -> None:
+    sb = get_supabase()
+    sb.table("posts").update({"media_urls": [media_url]}).eq("id", post_id).execute()

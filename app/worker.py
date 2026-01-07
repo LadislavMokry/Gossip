@@ -1,12 +1,20 @@
 import argparse
 import time
 
+from pathlib import Path
+
+from .config import get_settings
+from .media.audio import render_audio_roundup
+from .media.short_video import render_short_video
 from .pipeline import (
+    fetch_latest_audio_roundup,
+    fetch_latest_selected_video,
     run_audio_roundup,
     run_extraction,
     run_first_judge,
     run_generation,
     run_second_judge,
+    update_post_media,
 )
 from .scrape import (
     scrape_category_pages,
@@ -43,6 +51,8 @@ def main() -> None:
     sub.add_parser("generate", help="Run generation once")
     sub.add_parser("second-judge", help="Run second judge once")
     sub.add_parser("audio-roundup", help="Run audio roundup once")
+    sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
+    sub.add_parser("render-video", help="Render latest selected video to MP4")
 
     loop_parser = sub.add_parser("scrape-loop", help="Scrape on an interval")
     loop_parser.add_argument("--interval", type=int, default=3600, help="Seconds between runs")
@@ -98,6 +108,32 @@ def main() -> None:
     if args.command == "audio-roundup":
         count = run_audio_roundup()
         print(f"audio_roundup={count}")
+        return
+    if args.command == "render-audio-roundup":
+        settings = get_settings()
+        row = fetch_latest_audio_roundup()
+        if not row:
+            print("audio_roundup_rendered=0")
+            return
+        content = row.get("content") or {}
+        dialogue = content.get("dialogue") or []
+        out_dir = Path(settings.media_output_dir)
+        out_path = out_dir / f"audio_roundup_{row['id']}.mp3"
+        render_audio_roundup(dialogue, out_path)
+        print(f"audio_roundup_rendered=1 path={out_path}")
+        return
+    if args.command == "render-video":
+        settings = get_settings()
+        row = fetch_latest_selected_video()
+        if not row:
+            print("video_rendered=0")
+            return
+        content = row.get("content") or {}
+        out_dir = Path(settings.media_output_dir)
+        out_path = out_dir / f"video_{row['id']}.mp4"
+        render_short_video(content, out_path)
+        update_post_media(row["id"], str(out_path))
+        print(f"video_rendered=1 path={out_path}")
         return
 
     if args.command == "scrape-loop":

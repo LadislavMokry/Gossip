@@ -1,8 +1,11 @@
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Sequence
 
 from PIL import Image, ImageDraw, ImageFont
+
+from app.config import get_settings
 
 
 def create_placeholder_images(
@@ -34,33 +37,46 @@ def assemble_video(
     if not images:
         raise ValueError("No images to assemble")
 
-    concat_file = output_path.parent / "concat.txt"
+    settings = get_settings()
+    ffmpeg_bin = settings.ffmpeg_path or shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        raise RuntimeError("ffmpeg not found. Set FFMPEG_PATH or add ffmpeg to PATH.")
+
+    work_dir = images[0].parent
+    concat_file = work_dir / "concat.txt"
     lines = []
     for img in images:
-        lines.append(f"file '{img.as_posix()}'")
+        lines.append(f"file '{img.name}'")
         lines.append(f"duration {seconds_per_image}")
     # FFmpeg requires last file listed again without duration
-    lines.append(f"file '{images[-1].as_posix()}'")
+    lines.append(f"file '{images[-1].name}'")
     concat_file.write_text("\n".join(lines))
 
+    audio_arg = str(audio_path.resolve()) if audio_path else None
+    captions_arg = str(captions_path.resolve()) if captions_path else None
+    if audio_path and audio_path.parent == work_dir:
+        audio_arg = audio_path.name
+    if captions_path and captions_path.parent == work_dir:
+        captions_arg = captions_path.name
+
     cmd = [
-        "ffmpeg",
+        ffmpeg_bin,
         "-y",
         "-f",
         "concat",
         "-safe",
         "0",
         "-i",
-        str(concat_file),
+        "concat.txt",
         "-vsync",
         "vfr",
         "-r",
         str(fps),
     ]
     if audio_path:
-        cmd += ["-i", str(audio_path), "-shortest"]
+        cmd += ["-i", audio_arg, "-shortest"]
     if captions_path:
-        cmd += ["-vf", f"subtitles={captions_path}"]
-    cmd += [str(output_path)]
+        cmd += ["-vf", f"subtitles={captions_arg}"]
+    cmd += [str(output_path.resolve())]
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=work_dir)

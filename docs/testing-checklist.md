@@ -91,28 +91,35 @@ Notes:
   - Evidence: scored=true, judge_score populated, format_assignments present.
 
 ## 7) Generation (AI)
-- [ ] Run generation (`python -m app.worker generate`)
-  - Evidence:
+- [x] Run generation (`python -m app.worker generate`)
+  - Evidence: `generated_posts=12`
+  - Previous issue: OpenAI read timeout (request_timeout=30s) during generation.
 - [ ] Supabase: video-only posts inserted with variant_id
   - Query: `select id, content_type, generating_model, content from posts order by created_at desc limit 3;`
-  - Evidence:
+  - Evidence: content_type=video, generating_model=gpt-5-mini, content includes variant_id.
 
 ## 8) Second Judge (AI)
-- [ ] Run second judge (`python -m app.worker second-judge`)
-  - Evidence:
-- [ ] Supabase: posts.selected = true for winners (by variant_id)
-  - Evidence:
+- [x] Run second judge (`python -m app.worker second-judge`)
+  - Evidence: `second_judged=5`
+- [!] Note: OpenAI error (reasoning_effort 'minimal' unsupported for gpt-5.2; switched to 'low')
+- [x] Supabase: posts.selected = true for winners (by variant_id)
+  - Evidence: selected=true present on video posts after judging.
 - [ ] Supabase: model_performance updated (if RPC available)
   - Evidence:
 
 ## 9) Audio Roundup (AI)
-- [ ] Run audio roundup (`python -m app.worker audio-roundup`)
-  - Evidence:
-- [ ] Supabase: audio_roundup post inserted
-  - Evidence:
+- [x] Run audio roundup (`python -m app.worker audio-roundup`)
+  - Evidence: `audio_roundup=1`
+- [x] Supabase: audio_roundup post inserted
+  - Evidence: content_type=audio_roundup, generating_model=gpt-5-mini.
+- [x] Render audio roundup to MP3 (`python -m app.worker render-audio-roundup`)
+  - Evidence: `audio_roundup_rendered=1 path=media_out\\audio_roundup_db944425-ccb4-4413-ab0e-464e24f57c91.mp3`
 
 ## 10) Media Helpers (Optional)
-- [ ] Placeholder images generate (`app/media/video.py:create_placeholder_images`)
-  - Evidence:
-- [ ] FFmpeg assemble video (`app/media/video.py:assemble_video`)
+- [x] Placeholder images generate (`app/media/video.py:create_placeholder_images`)
+  - Evidence: `scene_01.png` etc. created in `media_out/tmp_video` when image gen fails.
+- [x] Render short video (`python -m app.worker render-video`)
+  - Evidence: `video_rendered=1 path=media_out\\video_80943106-3ae6-42af-83a4-4c72c73a1935.mp4`
+  - Note: Image generation returned 403 (OpenAI images access/billing), so placeholders used.
+- [ ] Karaoke captions (ASS) aligned to TTS (`ENABLE_ASR=true`)
   - Evidence:

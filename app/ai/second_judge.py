@@ -29,5 +29,5 @@ def pick_winner(format_name: str, versions: list[dict]) -> dict:
         user=f"{user}\nReturn JSON.",
         temperature=0.2,
         max_tokens=400,
-        reasoning_effort="minimal",
+        reasoning_effort="low",
     )
