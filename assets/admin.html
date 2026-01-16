@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gossip Admin</title>
+    <style>
+      :root {
+        --bg: #f3efe4;
+        --panel: #fffdf7;
+        --ink: #2a2a2a;
+        --muted: #6d6257;
+        --accent: #2f6f6d;
+        --accent-2: #b84e4e;
+        --border: #e4dccd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 20% 20%, #f8f4ea 0%, var(--bg) 60%);
+      }
+      header {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+        background: #f9f6ee;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.4px;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .panel h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .projects-list button {
+        width: 100%;
+        text-align: left;
+        padding: 8px 10px;
+        margin-bottom: 6px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .projects-list button.active {
+        border-color: var(--accent);
+        background: #e8f1f0;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      input, select, textarea {
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      textarea {
+        width: 100%;
+        min-height: 80px;
+      }
+      button.primary {
+        background: var(--accent);
+        color: white;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #f2e7da;
+        color: #3a2f26;
+        border: 0;
+        border-radius: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th, td {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .status-pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: #efe7da;
+      }
+      .items {
+        max-height: 240px;
+        overflow: auto;
+        border: 1px dashed var(--border);
+        padding: 8px;
+        border-radius: 8px;
+        background: #fff;
+      }
+      .items .item {
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .items .item:last-child {
+        border-bottom: none;
+      }
+      .small {
+        font-size: 12px;
+      }
+      .warn {
+        color: var(--accent-2);
+      }
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Gossip Admin</h1>
+      <button class="secondary" id="refresh">Refresh</button>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>Projects</h2>
+        <div class="projects-list" id="projects"></div>
+        <div class="row">
+          <input id="projectName" placeholder="Project name" />
+          <button class="primary" id="createProject">Add</button>
+        </div>
+        <div class="small muted">One project = one topic or channel.</div>
+      </section>
+
+      <section class="panel">
+        <h2>Sources</h2>
+        <div class="row">
+          <button class="primary" id="scrapeAll">Scrape All</button>
+          <span class="small muted" id="projectLabel">No project selected</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>URL</th>
+              <th>Last</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sources"></tbody>
+        </table>
+        <div class="row" style="margin-top: 8px;">
+          <input id="sourceName" placeholder="Source name" />
+          <select id="sourceType">
+            <option value="rss">rss</option>
+            <option value="page">page</option>
+            <option value="reddit">reddit</option>
+            <option value="youtube">youtube</option>
+          </select>
+          <input id="sourceUrl" placeholder="https://..." style="flex: 1 1 260px;" />
+          <button class="primary" id="addSource">Add Source</button>
+        </div>
+        <div class="small muted">For YouTube: use channel RSS URL. For Reddit: use /r/name/.rss</div>
+      </section>
+
+      <section class="panel">
+        <h2>Latest Items</h2>
+        <div class="items" id="items">
+          <div class="muted small">Select a source to see recent items.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>YouTube (V1)</h2>
+        <div class="small muted">Store a refresh token per project (OAuth setup later).</div>
+        <div class="row" style="margin-top: 8px;">
+          <input id="ytChannel" placeholder="Channel title (optional)" />
+          <input id="ytToken" placeholder="Refresh token" style="flex: 1 1 260px;" />
+          <button class="primary" id="saveYoutube">Save</button>
+        </div>
+        <div id="ytStatus" class="small muted"></div>
+      </section>
+    </main>
+    <script>
+      const state = {
+        projects: [],
+        sources: [],
+        currentProject: null,
+        currentSource: null
+      };
+
+      async function api(path, options = {}) {
+        const res = await fetch(path, {
+          headers: { "Content-Type": "application/json" },
+          ...options
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
+        return res.headers.get("content-type")?.includes("application/json")
+          ? res.json()
+          : res.text();
+      }
+
+      function renderProjects() {
+        const container = document.getElementById("projects");
+        container.innerHTML = "";
+        state.projects.forEach((p) => {
+          const btn = document.createElement("button");
+          btn.textContent = p.name;
+          if (state.currentProject && state.currentProject.id === p.id) {
+            btn.classList.add("active");
+          }
+          btn.onclick = () => selectProject(p);
+          container.appendChild(btn);
+        });
+      }
+
+      function renderSources() {
+        const tbody = document.getElementById("sources");
+        tbody.innerHTML = "";
+        state.sources.forEach((s) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${s.name}</td>
+            <td>${s.source_type}</td>
+            <td class="small">${s.url}</td>
+            <td class="small">${s.last_scraped_at ? s.last_scraped_at.split("T")[0] : "-"}</td>
+            <td><span class="status-pill">${s.last_status || "idle"}</span></td>
+            <td>
+              <button class="secondary" data-id="${s.id}">Scrape</button>
+              <button class="secondary" data-view="${s.id}">View</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll("button[data-id]").forEach((btn) => {
+          btn.onclick = () => scrapeSource(btn.dataset.id);
+        });
+        tbody.querySelectorAll("button[data-view]").forEach((btn) => {
+          btn.onclick = () => loadItems(btn.dataset.view);
+        });
+      }
+
+      async function loadProjects() {
+        state.projects = await api("/api/projects");
+        if (!state.currentProject && state.projects.length) {
+          await selectProject(state.projects[0]);
+          return;
+        }
+        renderProjects();
+        if (state.currentProject) {
+          document.getElementById("projectLabel").textContent = state.currentProject.name;
+          await loadSources();
+          await loadYoutube();
+        }
+      }
+
+      async function selectProject(project) {
+        state.currentProject = project;
+        document.getElementById("projectLabel").textContent = project.name;
+        renderProjects();
+        await loadSources();
+        await loadYoutube();
+      }
+
+      async function loadSources() {
+        if (!state.currentProject) return;
+        state.sources = await api(`/api/projects/${state.currentProject.id}/sources`);
+        renderSources();
+      }
+
+      async function addProject() {
+        const name = document.getElementById("projectName").value.trim();
+        if (!name) return;
+        await api("/api/projects", { method: "POST", body: JSON.stringify({ name }) });
+        document.getElementById("projectName").value = "";
+        await loadProjects();
+      }
+
+      async function addSource() {
+        if (!state.currentProject) return;
+        const name = document.getElementById("sourceName").value.trim();
+        const source_type = document.getElementById("sourceType").value;
+        const url = document.getElementById("sourceUrl").value.trim();
+        if (!name || !url) return;
+        await api(`/api/projects/${state.currentProject.id}/sources`, {
+          method: "POST",
+          body: JSON.stringify({ name, source_type, url, enabled: true })
+        });
+        document.getElementById("sourceName").value = "";
+        document.getElementById("sourceUrl").value = "";
+        await loadSources();
+      }
+
+      async function scrapeAll() {
+        if (!state.currentProject) return;
+        await api(`/api/projects/${state.currentProject.id}/scrape`, { method: "POST" });
+        await loadSources();
+      }
+
+      async function scrapeSource(sourceId) {
+        await api(`/api/sources/${sourceId}/scrape`, { method: "POST" });
+        await loadSources();
+      }
+
+      async function loadItems(sourceId) {
+        state.currentSource = sourceId;
+        const items = await api(`/api/sources/${sourceId}/items?limit=10`);
+        const container = document.getElementById("items");
+        if (!items.length) {
+          container.innerHTML = "<div class='muted small'>No items yet.</div>";
+          return;
+        }
+        container.innerHTML = items
+          .map(
+            (item) => `
+              <div class="item">
+                <div><strong>${item.title || "Untitled"}</strong></div>
+                <div class="small muted">${item.url}</div>
+                <div class="small">${(item.content || "").slice(0, 220)}</div>
+              </div>
+            `
+          )
+          .join("");
+      }
+
+      async function loadYoutube() {
+        if (!state.currentProject) return;
+        const info = await api(`/api/projects/${state.currentProject.id}/youtube`);
+        const status = document.getElementById("ytStatus");
+        if (info && info.refresh_token) {
+          status.textContent = `Saved token for: ${info.channel_title || "Unknown channel"}`;
+          status.classList.remove("warn");
+        } else {
+          status.textContent = "No YouTube token stored yet.";
+          status.classList.add("warn");
+        }
+      }
+
+      async function saveYoutube() {
+        if (!state.currentProject) return;
+        const refresh_token = document.getElementById("ytToken").value.trim();
+        const channel_title = document.getElementById("ytChannel").value.trim();
+        if (!refresh_token) return;
+        await api(`/api/projects/${state.currentProject.id}/youtube`, {
+          method: "POST",
+          body: JSON.stringify({ refresh_token, channel_title })
+        });
+        document.getElementById("ytToken").value = "";
+        await loadYoutube();
+      }
+
+      document.getElementById("createProject").onclick = addProject;
+      document.getElementById("addSource").onclick = addSource;
+      document.getElementById("scrapeAll").onclick = scrapeAll;
+      document.getElementById("saveYoutube").onclick = saveYoutube;
+      document.getElementById("refresh").onclick = loadProjects;
+
+      loadProjects().catch((err) => {
+        console.error(err);
+        alert("Failed to load. Check API and Supabase config.");
+      });
+    </script>
+  </body>
+</html>
