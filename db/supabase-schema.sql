@@ -236,11 +236,17 @@ CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   description TEXT,
+  language TEXT DEFAULT 'en',
+  generation_interval_hours INTEGER DEFAULT 12,
+  last_generated_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 COMMENT ON TABLE projects IS 'User-defined content projects (topics)';
+COMMENT ON COLUMN projects.language IS 'Language code for generation (e.g. en, es, sk)';
+COMMENT ON COLUMN projects.generation_interval_hours IS 'How often to generate content (hours)';
+COMMENT ON COLUMN projects.last_generated_at IS 'Last time generation ran for this project';
 
 -- TABLE 6: sources
 -- RSS feeds, pages, or other source types per project
@@ -252,6 +258,7 @@ CREATE TABLE IF NOT EXISTS sources (
   url TEXT NOT NULL,
   enabled BOOLEAN DEFAULT TRUE,
   config JSONB DEFAULT '{}'::jsonb,
+  scrape_interval_hours INTEGER DEFAULT 6,
   last_scraped_at TIMESTAMP WITH TIME ZONE,
   last_status TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -264,6 +271,7 @@ CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled) WHERE enabled
 CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(source_type);
 
 COMMENT ON TABLE sources IS 'Per-project content sources (rss, page, reddit, youtube)';
+COMMENT ON COLUMN sources.scrape_interval_hours IS 'How often to scrape this source (hours)';
 
 -- TABLE 7: source_items
 -- Latest scraped items for monitoring and debugging
@@ -298,6 +306,22 @@ CREATE TABLE IF NOT EXISTS youtube_accounts (
 );
 
 COMMENT ON TABLE youtube_accounts IS 'OAuth refresh tokens for YouTube uploads';
+
+-- ============================================================
+-- MIGRATION HELPERS (safe to re-run)
+-- ============================================================
+
+ALTER TABLE IF EXISTS projects
+  ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'en';
+
+ALTER TABLE IF EXISTS projects
+  ADD COLUMN IF NOT EXISTS generation_interval_hours INTEGER DEFAULT 12;
+
+ALTER TABLE IF EXISTS projects
+  ADD COLUMN IF NOT EXISTS last_generated_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE IF EXISTS sources
+  ADD COLUMN IF NOT EXISTS scrape_interval_hours INTEGER DEFAULT 6;
 
 -- ============================================================
 -- HELPER VIEWS (Optional but useful)

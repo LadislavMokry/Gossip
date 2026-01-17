@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gossip Admin</title>
+    <title>OnePlace Admin</title>
     <style>
       :root {
         --bg: #f3efe4;
@@ -151,7 +151,7 @@
   </head>
   <body>
     <header>
-      <h1>Gossip Admin</h1>
+      <h1>OnePlace Admin</h1>
       <button class="secondary" id="refresh">Refresh</button>
     </header>
     <main>
@@ -161,6 +161,23 @@
         <div class="row">
           <input id="projectName" placeholder="Project name" />
           <button class="primary" id="createProject">Add</button>
+        </div>
+        <div class="row" style="margin-top: 8px;">
+          <select id="projectLanguage">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="sk">Slovakian</option>
+          </select>
+          <input
+            id="projectGenInterval"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Generate hrs"
+            style="max-width: 140px;"
+          />
+          <button class="secondary" id="saveProject">Save Settings</button>
+          <button class="secondary" id="deleteProject">Delete Project</button>
         </div>
         <div class="small muted">One project = one topic or channel.</div>
       </section>
@@ -178,6 +195,7 @@
               <th>Type</th>
               <th>URL</th>
               <th>Last</th>
+              <th>Every (hrs)</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -193,6 +211,14 @@
             <option value="youtube">youtube</option>
           </select>
           <input id="sourceUrl" placeholder="https://..." style="flex: 1 1 260px;" />
+          <input
+            id="sourceInterval"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Scrape hrs"
+            style="max-width: 120px;"
+          />
           <button class="primary" id="addSource">Add Source</button>
         </div>
         <div class="small muted">For YouTube: use channel RSS URL. For Reddit: use /r/name/.rss</div>
@@ -215,13 +241,25 @@
         </div>
         <div id="ytStatus" class="small muted"></div>
       </section>
+
+      <section class="panel">
+        <h2>Audio Roundup</h2>
+        <div class="small muted">Generate script in project language, then render audio (TTS + ffmpeg required).</div>
+        <div class="row" style="margin-top: 8px;">
+          <button class="primary" id="generateRoundup">Generate Script</button>
+          <button class="secondary" id="renderRoundup">Render Audio</button>
+          <div id="roundupStatus" class="small muted"></div>
+        </div>
+        <audio id="roundupAudio" controls style="width: 100%; margin-top: 8px;"></audio>
+      </section>
     </main>
     <script>
       const state = {
         projects: [],
         sources: [],
         currentProject: null,
-        currentSource: null
+        currentSource: null,
+        currentRoundup: null
       };
 
       async function api(path, options = {}) {
@@ -262,10 +300,12 @@
             <td>${s.source_type}</td>
             <td class="small">${s.url}</td>
             <td class="small">${s.last_scraped_at ? s.last_scraped_at.split("T")[0] : "-"}</td>
+            <td class="small">${s.scrape_interval_hours ?? "-"}</td>
             <td><span class="status-pill">${s.last_status || "idle"}</span></td>
             <td>
               <button class="secondary" data-id="${s.id}">Scrape</button>
               <button class="secondary" data-view="${s.id}">View</button>
+              <button class="secondary" data-edit="${s.id}">Edit</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -275,6 +315,9 @@
         });
         tbody.querySelectorAll("button[data-view]").forEach((btn) => {
           btn.onclick = () => loadItems(btn.dataset.view);
+        });
+        tbody.querySelectorAll("button[data-edit]").forEach((btn) => {
+          btn.onclick = () => editSource(btn.dataset.edit);
         });
       }
 
@@ -295,6 +338,12 @@
       async function selectProject(project) {
         state.currentProject = project;
         document.getElementById("projectLabel").textContent = project.name;
+        const langValue = ["en", "es", "sk"].includes(project.language)
+          ? project.language
+          : "en";
+        document.getElementById("projectLanguage").value = langValue;
+        document.getElementById("projectGenInterval").value =
+          project.generation_interval_hours || "";
         renderProjects();
         await loadSources();
         await loadYoutube();
@@ -319,13 +368,27 @@
         const name = document.getElementById("sourceName").value.trim();
         const source_type = document.getElementById("sourceType").value;
         const url = document.getElementById("sourceUrl").value.trim();
+        const intervalRaw = document.getElementById("sourceInterval").value.trim();
+        const scrape_interval_hours =
+          intervalRaw === "" ? null : Number(intervalRaw);
+        if (intervalRaw !== "" && (!Number.isFinite(scrape_interval_hours) || scrape_interval_hours <= 0)) {
+          alert("Scrape interval must be a number > 0.");
+          return;
+        }
         if (!name || !url) return;
         await api(`/api/projects/${state.currentProject.id}/sources`, {
           method: "POST",
-          body: JSON.stringify({ name, source_type, url, enabled: true })
+          body: JSON.stringify({
+            name,
+            source_type,
+            url,
+            enabled: true,
+            scrape_interval_hours
+          })
         });
         document.getElementById("sourceName").value = "";
         document.getElementById("sourceUrl").value = "";
+        document.getElementById("sourceInterval").value = "";
         await loadSources();
       }
 
@@ -337,6 +400,25 @@
 
       async function scrapeSource(sourceId) {
         await api(`/api/sources/${sourceId}/scrape`, { method: "POST" });
+        await loadSources();
+      }
+
+      async function editSource(sourceId) {
+        const current = state.sources.find((s) => s.id === sourceId);
+        const value = prompt(
+          "Scrape interval (hours)",
+          current?.scrape_interval_hours || ""
+        );
+        if (value === null) return;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          alert("Please enter a number > 0.");
+          return;
+        }
+        await api(`/api/sources/${sourceId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ scrape_interval_hours: parsed })
+        });
         await loadSources();
       }
 
@@ -387,10 +469,88 @@
         await loadYoutube();
       }
 
+      async function generateRoundup() {
+        if (!state.currentProject) return;
+        const status = document.getElementById("roundupStatus");
+        status.textContent = "Generating script...";
+        try {
+          const result = await api(`/api/projects/${state.currentProject.id}/audio-roundup`, {
+            method: "POST"
+          });
+          if (result.status !== "ok") {
+            status.textContent = "No items available for roundup.";
+            state.currentRoundup = null;
+            return;
+          }
+          state.currentRoundup = result.post;
+          status.textContent = "Script ready. Render audio when ready.";
+        } catch (err) {
+          console.error(err);
+          status.textContent = "Failed to generate script.";
+        }
+      }
+
+      async function renderRoundup() {
+        if (!state.currentRoundup?.id) {
+          alert("Generate a script first.");
+          return;
+        }
+        const status = document.getElementById("roundupStatus");
+        status.textContent = "Rendering audio...";
+        try {
+          const result = await api(`/api/audio-roundup/${state.currentRoundup.id}/render`, {
+            method: "POST"
+          });
+          const audio = document.getElementById("roundupAudio");
+          audio.src = `${result.url}?t=${Date.now()}`;
+          audio.play().catch(() => {});
+          status.textContent = "Audio ready.";
+        } catch (err) {
+          console.error(err);
+          status.textContent = "Failed to render audio. Check TTS + ffmpeg.";
+        }
+      }
+
+      async function saveProjectSettings() {
+        if (!state.currentProject) return;
+        const language = document.getElementById("projectLanguage").value;
+        const genRaw = document.getElementById("projectGenInterval").value.trim();
+        const genInterval = genRaw === "" ? null : Number(genRaw);
+        if (genRaw !== "" && (!Number.isFinite(genInterval) || genInterval <= 0)) {
+          alert("Generation interval must be a number > 0.");
+          return;
+        }
+        await api(`/api/projects/${state.currentProject.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            language: language || null,
+            generation_interval_hours: genInterval
+          })
+        });
+        await loadProjects();
+      }
+
+      async function deleteProject() {
+        if (!state.currentProject) return;
+        const name = state.currentProject.name || "this project";
+        const ok = confirm(`Delete ${name}? This will remove its sources and items.`);
+        if (!ok) return;
+        await api(`/api/projects/${state.currentProject.id}`, { method: "DELETE" });
+        state.currentProject = null;
+        document.getElementById("projectLabel").textContent = "No project selected";
+        document.getElementById("projectLanguage").value = "";
+        document.getElementById("projectGenInterval").value = "";
+        await loadProjects();
+      }
+
       document.getElementById("createProject").onclick = addProject;
       document.getElementById("addSource").onclick = addSource;
       document.getElementById("scrapeAll").onclick = scrapeAll;
       document.getElementById("saveYoutube").onclick = saveYoutube;
+      document.getElementById("saveProject").onclick = saveProjectSettings;
+      document.getElementById("deleteProject").onclick = deleteProject;
+      document.getElementById("generateRoundup").onclick = generateRoundup;
+      document.getElementById("renderRoundup").onclick = renderRoundup;
       document.getElementById("refresh").onclick = loadProjects;
 
       loadProjects().catch((err) => {

@@ -1,5 +1,46 @@
 # Handoff Notes
-Last updated: 2026-01-07
+Last updated: 2026-01-17
+
+## Summary of this session (2026-01-17)
+- Admin UI renamed to **OnePlace Admin**.
+- Project settings added: language (dropdown: en/es/sk) + generation interval hours.
+- Source settings added: scrape interval hours.
+- Project delete implemented (UI + API).
+- Audio Roundup UI added: generate script + render audio + preview player.
+- Audio roundup generation now respects project language (only at script generation stage).
+- New API endpoints:
+  - `POST /api/projects/{project_id}/audio-roundup`
+  - `POST /api/audio-roundup/{post_id}/render`
+  - `GET /api/audio-roundup/{post_id}/audio`
+  - `DELETE /api/projects/{project_id}`
+- Schema updates (added columns): `projects.language`, `projects.generation_interval_hours`, `projects.last_generated_at`, `sources.scrape_interval_hours`.
+- Added TODO: per-language TTS model/voice selection (plan for ElevenLabs).
+- Added `docs/startup-guide.md`.
+
+## Current blockers / open issues
+- FFmpeg not installed on user’s Windows machine yet; required for audio render.
+- TTS requires `ENABLE_TTS=true` and a valid `OPENAI_API_KEY`.
+
+## Next steps (recommended)
+1. Install FFmpeg (e.g., `winget install --id=Gyan.FFmpeg`) and restart terminal/IDE.
+2. Verify `ffmpeg -version` works.
+3. In UI: select project language → Save Settings → Generate Script → Render Audio → preview.
+4. Add F1 project sources and test scraping.
+
+## Notable code changes in this session
+- `assets/admin.html`: language dropdown, intervals, delete project, audio roundup panel, OnePlace title.
+- `app/main.py`: new audio roundup + delete project endpoints, audio file serving.
+- `app/admin.py`: create/update project/source extended; delete project.
+- `app/ai/audio_roundup.py`: language-aware system prompt.
+- `app/pipeline.py`: `run_audio_roundup` supports project_id/language.
+- `app/worker.py`: `audio-roundup` CLI supports `--project-id`/`--language`.
+- `db/supabase-schema.sql`: new columns + safe ALTERs.
+- `docs/todo.md`: ElevenLabs/per-language TTS note.
+- `docs/startup-guide.md`: quickstart commands.
+
+---
+
+## Summary of this session
 
 ## Summary of this session
 - End-to-end pipeline tested: scrape → extract → judge → generate → second-judge → audio-roundup → render-audio-roundup → render-video.

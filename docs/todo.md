@@ -68,6 +68,7 @@ Update Notice (2026-01-05): Video-first scope (shorts + audio roundup). Multi-fo
 - [ ] Build first judge worker (score + format assignments)
 - [ ] Build generator worker (multi-format outputs)
 - [ ] Build second judge worker (best selection)
+- [ ] Add per-language TTS model/voice selection (plan to switch to ElevenLabs for higher quality)
 
 ### Phase 4: Publishing (Planned)
 - [ ] Define platforms + credentials

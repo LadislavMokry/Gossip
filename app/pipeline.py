@@ -260,8 +260,23 @@ def insert_audio_roundup(model: str, content: dict) -> int:
     return len(resp.data or [])
 
 
-def run_audio_roundup() -> int:
+def _project_language(project_id: str) -> str | None:
+    sb = get_supabase()
+    resp = (
+        sb.table("projects")
+        .select("language")
+        .eq("id", project_id)
+        .limit(1)
+        .execute()
+    )
+    data = resp.data or []
+    return data[0].get("language") if data else None
+
+
+def run_audio_roundup(project_id: str | None = None, language: str | None = None) -> int:
     settings = get_settings()
+    if project_id and not language:
+        language = _project_language(project_id)
     items = fetch_for_audio_roundup(
         limit=settings.audio_roundup_size, hours=settings.audio_roundup_hours
     )
@@ -271,7 +286,7 @@ def run_audio_roundup() -> int:
         {"title": item.get("title"), "summary": item.get("summary")}
         for item in items
     ]
-    content = generate_audio_roundup(stories)
+    content = generate_audio_roundup(stories, language=language)
     return insert_audio_roundup(settings.audio_roundup_model, content)
 
 

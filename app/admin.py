@@ -36,7 +36,12 @@ def list_projects() -> list[dict]:
     return res.data or []
 
 
-def create_project(name: str, description: str | None = None) -> dict:
+def create_project(
+    name: str,
+    description: str | None = None,
+    language: str | None = None,
+    generation_interval_hours: int | None = None,
+) -> dict:
     sb = get_supabase()
     row = {
         "name": name.strip(),
@@ -44,6 +49,10 @@ def create_project(name: str, description: str | None = None) -> dict:
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
+    if language and language.strip():
+        row["language"] = language.strip()
+    if generation_interval_hours is not None:
+        row["generation_interval_hours"] = generation_interval_hours
     res = sb.table("projects").insert(row).execute()
     return (res.data or [row])[0]
 
@@ -51,9 +60,16 @@ def create_project(name: str, description: str | None = None) -> dict:
 def update_project(project_id: str, fields: dict) -> dict:
     sb = get_supabase()
     payload = {k: v for k, v in fields.items() if v is not None}
+    if "language" in payload and payload["language"]:
+        payload["language"] = payload["language"].strip()
     payload["updated_at"] = _now_iso()
     res = sb.table("projects").update(payload).eq("id", project_id).execute()
     return (res.data or [payload])[0]
+
+
+def delete_project(project_id: str) -> None:
+    sb = get_supabase()
+    sb.table("projects").delete().eq("id", project_id).execute()
 
 
 def list_sources(project_id: str) -> list[dict]:
@@ -86,6 +102,8 @@ def create_source(project_id: str, row: dict) -> dict:
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
+    if row.get("scrape_interval_hours") is not None:
+        payload["scrape_interval_hours"] = row.get("scrape_interval_hours")
     res = sb.table("sources").insert(payload).execute()
     return (res.data or [payload])[0]
 

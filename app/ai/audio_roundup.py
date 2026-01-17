@@ -1,15 +1,32 @@
 from app.ai.openai_client import OpenAIClient
 from app.config import get_settings
 
-SYSTEM_PROMPT = (
-    "You are a Slovak podcast writer. Create a 3-5 minute audio roundup script "
-    "for two hosts (host_a male, host_b female). Return JSON with keys: "
-    "dialogue (array of {speaker, text}) and duration_seconds. Keep it concise, "
-    "current, and engaging."
-)
+LANGUAGE_LABELS = {
+    "en": "English",
+    "es": "Spanish",
+    "sk": "Slovak",
+}
 
 
-def generate_audio_roundup(items: list[dict]) -> dict:
+def _language_label(value: str | None) -> str:
+    if not value:
+        return LANGUAGE_LABELS["en"]
+    key = value.strip().lower()
+    return LANGUAGE_LABELS.get(key, value.strip())
+
+
+def _system_prompt(language: str | None) -> str:
+    language_label = _language_label(language)
+    return (
+        f"You are a podcast writer. Write the script in {language_label}. "
+        "Create a 3-5 minute audio roundup script for two hosts "
+        "(host_a male, host_b female). Return JSON with keys: dialogue "
+        "(array of {speaker, text}) and duration_seconds. Keep it concise, "
+        "current, and engaging."
+    )
+
+
+def generate_audio_roundup(items: list[dict], language: str | None = None) -> dict:
     settings = get_settings()
     client = OpenAIClient()
     user = {
@@ -19,7 +36,7 @@ def generate_audio_roundup(items: list[dict]) -> dict:
     }
     return client.chat_json(
         model=settings.audio_roundup_model,
-        system=SYSTEM_PROMPT,
+        system=_system_prompt(language),
         user=f"{user}\nReturn JSON.",
         temperature=0.6,
         max_tokens=1400,

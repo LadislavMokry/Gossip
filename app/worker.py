@@ -50,7 +50,9 @@ def main() -> None:
     sub.add_parser("judge", help="Run first judge once")
     sub.add_parser("generate", help="Run generation once")
     sub.add_parser("second-judge", help="Run second judge once")
-    sub.add_parser("audio-roundup", help="Run audio roundup once")
+    audio_roundup = sub.add_parser("audio-roundup", help="Run audio roundup once")
+    audio_roundup.add_argument("--project-id", type=str, default=None, help="Project ID for language settings")
+    audio_roundup.add_argument("--language", type=str, default=None, help="Override language (en, es, sk)")
     sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
     sub.add_parser("render-video", help="Render latest selected video to MP4")
 
@@ -106,7 +108,7 @@ def main() -> None:
         print(f"second_judged={count}")
         return
     if args.command == "audio-roundup":
-        count = run_audio_roundup()
+        count = run_audio_roundup(project_id=args.project_id, language=args.language)
         print(f"audio_roundup={count}")
         return
     if args.command == "render-audio-roundup":
