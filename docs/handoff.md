@@ -1,5 +1,29 @@
 # Handoff Notes
-Last updated: 2026-01-17
+Last updated: 2026-01-18
+
+## Summary of this session (2026-01-18)
+- Added F1 sources to project and expanded Admin UI for inline item viewing + auth management per source.
+- Source auth: login panel with basic/cookie/header options; auto-detect login walls; Check All button with spinner.
+- New ingest flow: source_items → full article text (trafilatura) → articles; URL normalization + content hash dedupe.
+- Pipeline button in UI runs: scrape → ingest → extract → score → dedupe → expire (loops until empty with caps).
+- Project settings: configurable unusable thresholds (score + age hours); displayed per-project inputs.
+- Articles & Scores table: pagination, ordering, used/unusable flags; unscored items sorted last.
+- Usage tracking: added `article_usage` table and marking for audio roundups.
+- Added `/stats` page + API for source hit-rate (% of articles used in audio roundup) and avg score per source.
+- Added `articles.source_id` to track source-level stats.
+
+## Current blockers / open issues
+- Need to run DB migrations for new columns/tables (see `db/supabase-schema.sql`).
+  - At minimum: add `articles.source_id`.
+- Stats only count articles ingested after `source_id` exists (older articles need backfill if desired).
+
+## Next steps (recommended)
+1. Re-run pipeline and verify articles get scored + appear in Articles & Scores.
+2. Test audio roundup generation (Generate Script → Render Audio) after scoring completes.
+3. Validate `/stats` page and decide whether to backfill older articles with `source_id`.
+4. Implement auto-scheduling for pipeline + audio roundup (set-and-forget).
+5. Test generating + plan automation for uploading and post-performance stats ingestion.
+6. Brainstorm social strategy + monetization plan; plan how to automate social account setup (or decide manual process).
 
 ## Summary of this session (2026-01-17, later)
 - Admin UI JS refactor: cached DOM refs, event delegation for source actions, shared helpers, and safer HTML rendering.
