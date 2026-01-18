@@ -234,8 +234,22 @@ def api_run_pipeline(project_id: str) -> dict:
     scrape_results = scrape_project(project_id, max_items=10)
     results["scrape"] = [r.__dict__ for r in scrape_results]
     results["ingest"] = ingest_source_items(limit=50, fetch_full=True, project_id=project_id)
-    results["extract"] = run_extraction(limit=20, project_id=project_id)
-    results["judge"] = run_first_judge(limit=50, project_id=project_id)
+    extract_total = 0
+    judge_total = 0
+    max_extract = 200
+    max_judge = 500
+    while extract_total < max_extract:
+        count = run_extraction(limit=20, project_id=project_id)
+        extract_total += count
+        if count == 0:
+            break
+    while judge_total < max_judge:
+        count = run_first_judge(limit=50, project_id=project_id)
+        judge_total += count
+        if count == 0:
+            break
+    results["extract"] = extract_total
+    results["judge"] = judge_total
     results["dedupe"] = dedupe_articles(project_id)
     results["unusable"] = mark_low_score_unusable(project_id)
     return {"status": "ok", "results": results}

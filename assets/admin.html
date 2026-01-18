@@ -220,39 +220,54 @@
           <button class="primary" id="createProject">Add</button>
         </div>
         <div class="row" style="margin-top: 8px;">
-          <select id="projectLanguage">
+          <label class="small" style="min-width: 100px;">Language</label>
+          <select id="projectLanguage" style="max-width: 200px;">
             <option value="en">English</option>
             <option value="es">Spanish</option>
             <option value="sk">Slovakian</option>
           </select>
+        </div>
+        <div class="row">
+          <label class="small" style="min-width: 100px;">Post</label>
           <input
             id="projectGenInterval"
             type="number"
             min="1"
             step="1"
-            placeholder="Generate hrs"
-            style="max-width: 140px;"
+            placeholder="12"
+            style="max-width: 200px;"
           />
+          <span class="small muted">hours</span>
+        </div>
+        <div class="row">
+          <label class="small" style="min-width: 100px;">Minimal score</label>
           <input
             id="projectUnusableScore"
             type="number"
             min="1"
             max="10"
             step="1"
-            placeholder="Unusable score <"
-            style="max-width: 170px;"
+            placeholder="5"
+            style="max-width: 200px;"
           />
+        </div>
+        <div class="row">
+          <label class="small" style="min-width: 100px;">Unusable age</label>
           <input
             id="projectUnusableAge"
             type="number"
             min="1"
             step="1"
-            placeholder="Unusable age hrs"
-            style="max-width: 170px;"
+            placeholder="48"
+            style="max-width: 200px;"
           />
+          <span class="small muted">hours</span>
+        </div>
+        <div class="row">
           <button class="secondary" id="saveProject">Save Settings</button>
           <button class="secondary" id="deleteProject">Delete Project</button>
         </div>
+        <div class="small muted" id="projectSummary">No project selected.</div>
         <div class="small muted">One project = one topic or channel.</div>
       </section>
 
@@ -371,6 +386,7 @@
         projectUnusableScore: document.getElementById("projectUnusableScore"),
         projectUnusableAge: document.getElementById("projectUnusableAge"),
         projectLabel: document.getElementById("projectLabel"),
+        projectSummary: document.getElementById("projectSummary"),
         sources: document.getElementById("sources"),
         sourceName: document.getElementById("sourceName"),
         sourceType: document.getElementById("sourceType"),
@@ -463,6 +479,23 @@
         return `${days}d`;
       }
 
+      function languageLabel(code) {
+        const map = { en: "English", es: "Spanish", sk: "Slovakian" };
+        return map[code] || code || "-";
+      }
+
+      function renderProjectSummary(project) {
+        if (!project) {
+          dom.projectSummary.textContent = "No project selected.";
+          return;
+        }
+        const lang = languageLabel(project.language || dom.projectLanguage.value);
+        const interval = project.generation_interval_hours ?? dom.projectGenInterval.value ?? "-";
+        const score = project.unusable_score_threshold ?? dom.projectUnusableScore.value ?? "-";
+        const age = project.unusable_age_hours ?? dom.projectUnusableAge.value ?? "-";
+        dom.projectSummary.textContent = `Language: ${lang} · Post: ${interval} hours · Minimal score: ${score} · Unusable age: ${age} hours`;
+      }
+
       function renderProjects() {
         dom.projects.innerHTML = "";
         state.projects.forEach((p) => {
@@ -521,12 +554,14 @@
         renderProjects();
         if (state.currentProject) {
           dom.projectLabel.textContent = state.currentProject.name;
+          renderProjectSummary(state.currentProject);
           await Promise.all([loadSources(), loadYoutube(), loadArticles()]);
         } else {
           dom.projectLabel.textContent = "No project selected";
           dom.sources.innerHTML = "";
           closeInlinePanels();
           dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No project selected.</td></tr>";
+          renderProjectSummary(null);
         }
       }
 
@@ -540,6 +575,7 @@
         dom.projectGenInterval.value = project.generation_interval_hours || "";
         dom.projectUnusableScore.value = project.unusable_score_threshold || "";
         dom.projectUnusableAge.value = project.unusable_age_hours || "";
+        renderProjectSummary(project);
         renderProjects();
         await Promise.all([loadSources(), loadYoutube(), loadArticles()]);
       }
@@ -980,6 +1016,7 @@
         dom.projectUnusableAge.value = "";
         closeInlinePanels();
         dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No project selected.</td></tr>";
+        renderProjectSummary(null);
         await loadProjects();
       }
 
