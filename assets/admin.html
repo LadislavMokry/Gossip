@@ -331,7 +331,25 @@
         <h2>Articles & Scores</h2>
         <div class="row">
           <button class="secondary" id="refreshArticles">Refresh</button>
-          <span class="small muted">Sorted by score (unused first).</span>
+          <label class="small">Show</label>
+          <select id="articlesLimit">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+          <label class="small">Order</label>
+          <select id="articlesOrder">
+            <option value="score">score</option>
+            <option value="age">age</option>
+            <option value="status">status</option>
+          </select>
+          <select id="articlesDirection">
+            <option value="desc">desc</option>
+            <option value="asc">asc</option>
+          </select>
+          <button class="secondary" id="articlesPrev">Prev</button>
+          <button class="secondary" id="articlesNext">Next</button>
+          <span class="small muted" id="articlesPage">1 / 1</span>
         </div>
         <table>
           <thead>
@@ -376,7 +394,9 @@
         currentProject: null,
         currentSource: null,
         currentAuthSource: null,
-        currentRoundup: null
+        currentRoundup: null,
+        articlesOffset: 0,
+        articlesLimit: 20
       };
       const dom = {
         projects: document.getElementById("projects"),
@@ -394,6 +414,12 @@
         sourceInterval: document.getElementById("sourceInterval"),
         items: document.getElementById("items"),
         articles: document.getElementById("articles"),
+        articlesLimit: document.getElementById("articlesLimit"),
+        articlesOrder: document.getElementById("articlesOrder"),
+        articlesDirection: document.getElementById("articlesDirection"),
+        articlesPrev: document.getElementById("articlesPrev"),
+        articlesNext: document.getElementById("articlesNext"),
+        articlesPage: document.getElementById("articlesPage"),
         ytChannel: document.getElementById("ytChannel"),
         ytToken: document.getElementById("ytToken"),
         ytStatus: document.getElementById("ytStatus"),
@@ -780,23 +806,14 @@
         currentRow.parentNode.insertBefore(row, currentRow.nextSibling);
       }
 
-      function renderArticles(rows) {
+      function renderArticles(rows, total) {
         dom.articles.innerHTML = "";
         if (!rows.length) {
           dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No articles yet.</td></tr>";
+          dom.articlesPage.textContent = "0 / 0";
           return;
         }
-        const sorted = [...rows].sort((a, b) => {
-          const usedA = a.used_in_audio ? 1 : 0;
-          const usedB = b.used_in_audio ? 1 : 0;
-          if (usedA !== usedB) return usedA - usedB;
-          const scoreA = Number(a.judge_score || 0);
-          const scoreB = Number(b.judge_score || 0);
-          if (scoreA !== scoreB) return scoreB - scoreA;
-          const dateA = new Date(a.scraped_at || 0).getTime();
-          const dateB = new Date(b.scraped_at || 0).getTime();
-          return dateB - dateA;
-        });
+        const sorted = [...rows];
         sorted.forEach((a) => {
           const tr = document.createElement("tr");
           const title = escapeHtml(a.title || "Untitled");
@@ -817,12 +834,24 @@
           `;
           dom.articles.appendChild(tr);
         });
+        const totalPages = Math.max(1, Math.ceil((total || rows.length) / state.articlesLimit));
+        const currentPage = Math.floor(state.articlesOffset / state.articlesLimit) + 1;
+        dom.articlesPage.textContent = `${currentPage} / ${totalPages}`;
+        dom.articlesPrev.disabled = currentPage <= 1;
+        dom.articlesNext.disabled = currentPage >= totalPages;
       }
 
       async function loadArticles() {
         if (!state.currentProject) return;
-        const rows = await api(`/api/projects/${state.currentProject.id}/articles?limit=200`);
-        renderArticles(rows || []);
+        const order = dom.articlesOrder.value;
+        const direction = dom.articlesDirection.value;
+        const limit = state.articlesLimit;
+        const offset = state.articlesOffset;
+        const result = await api(
+          `/api/projects/${state.currentProject.id}/articles?limit=${limit}&offset=${offset}&order_by=${order}&direction=${direction}`
+        );
+        const rows = result.items || [];
+        renderArticles(rows, result.total || rows.length);
       }
 
       function buildAuthPanel(source) {
@@ -1047,6 +1076,27 @@
       dom.scrapeAll.onclick = scrapeAll;
       dom.checkAll.onclick = checkAllSources;
       dom.runPipeline.onclick = runPipeline;
+      dom.articlesLimit.onchange = () => {
+        state.articlesLimit = Number(dom.articlesLimit.value);
+        state.articlesOffset = 0;
+        loadArticles();
+      };
+      dom.articlesOrder.onchange = () => {
+        state.articlesOffset = 0;
+        loadArticles();
+      };
+      dom.articlesDirection.onchange = () => {
+        state.articlesOffset = 0;
+        loadArticles();
+      };
+      dom.articlesPrev.onclick = () => {
+        state.articlesOffset = Math.max(0, state.articlesOffset - state.articlesLimit);
+        loadArticles();
+      };
+      dom.articlesNext.onclick = () => {
+        state.articlesOffset = state.articlesOffset + state.articlesLimit;
+        loadArticles();
+      };
       dom.saveYoutube.onclick = saveYoutube;
       dom.saveProject.onclick = saveProjectSettings;
       dom.deleteProject.onclick = deleteProject;

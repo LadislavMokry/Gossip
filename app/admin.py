@@ -353,23 +353,42 @@ def list_source_items(source_id: str, limit: int = 10) -> list[dict]:
     return res.data or []
 
 
-def list_articles(project_id: str, limit: int = 50) -> list[dict]:
+def list_articles_page(
+    project_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    order_by: str = "score",
+    direction: str = "desc",
+) -> dict:
     sb = get_supabase()
-    items = (
+    query = (
         sb.table("articles")
         .select(
-            "id, title, judge_score, scraped_at, processed, scored, unusable, unusable_reason, duplicate_of"
+            "id, title, judge_score, scraped_at, processed, scored, unusable, unusable_reason, duplicate_of",
+            count="exact",
         )
         .eq("project_id", project_id)
-        .order("judge_score", desc=True)
-        .order("scraped_at", desc=True)
-        .limit(limit)
-        .execute()
-        .data
-        or []
     )
+    order_by = (order_by or "score").lower()
+    direction = (direction or "desc").lower()
+    desc = direction != "asc"
+    if order_by == "age":
+        query = query.order("scraped_at", desc=desc)
+    elif order_by == "status":
+        query = (
+            query.order("unusable", desc=False)
+            .order("scored", desc=True)
+            .order("processed", desc=True)
+            .order("scraped_at", desc=True)
+        )
+    else:
+        query = query.order("judge_score", desc=desc).order("scraped_at", desc=True)
+    query = query.range(offset, offset + limit - 1)
+    resp = query.execute()
+    items = resp.data or []
+    total = resp.count or 0
     if not items:
-        return []
+        return {"items": [], "total": total}
     article_ids = [i["id"] for i in items]
     usage = (
         sb.table("article_usage")
@@ -383,7 +402,7 @@ def list_articles(project_id: str, limit: int = 50) -> list[dict]:
     used_ids = {u["article_id"] for u in usage if u.get("article_id")}
     for item in items:
         item["used_in_audio"] = item["id"] in used_ids
-    return items
+    return {"items": items, "total": total}
 
 
 def get_youtube_account(project_id: str) -> dict | None:

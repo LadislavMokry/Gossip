@@ -15,7 +15,7 @@ from .admin import (
     ingest_source_items,
     get_source,
     get_youtube_account,
-    list_articles,
+    list_articles_page,
     list_projects,
     list_source_items,
     list_sources,
@@ -261,8 +261,14 @@ def api_list_source_items(source_id: str, limit: int = Query(10, ge=1, le=50)) -
 
 
 @app.get("/api/projects/{project_id}/articles")
-def api_list_articles(project_id: str, limit: int = Query(50, ge=1, le=200)) -> list[dict]:
-    return list_articles(project_id, limit=limit)
+def api_list_articles(
+    project_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    order_by: str = Query("score"),
+    direction: str = Query("desc"),
+) -> dict:
+    return list_articles_page(project_id, limit=limit, offset=offset, order_by=order_by, direction=direction)
 
 
 @app.post("/api/sources/{source_id}/check-access")
