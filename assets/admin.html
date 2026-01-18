@@ -260,8 +260,12 @@
         <h2>Sources</h2>
         <div class="row">
           <button class="primary" id="scrapeAll">Scrape All</button>
+          <span id="scrapeAllSpinner" class="spinner hidden" aria-label="Scraping"></span>
           <button class="secondary" id="checkAll">Check All</button>
           <span id="checkAllSpinner" class="spinner hidden" aria-label="Checking"></span>
+          <button class="secondary" id="runPipeline">Run Pipeline</button>
+          <span id="runPipelineSpinner" class="spinner hidden" aria-label="Pipeline"></span>
+          <span class="small muted" id="pipelineStatus">Idle.</span>
           <span class="small muted" id="projectLabel">No project selected</span>
         </div>
         <table>
@@ -299,15 +303,6 @@
           <button class="primary" id="addSource">Add Source</button>
         </div>
         <div class="small muted">For YouTube: use channel RSS URL. For Reddit: use /r/name/.rss</div>
-      </section>
-
-      <section class="panel">
-        <h2>Pipeline</h2>
-        <div class="row">
-          <button class="primary" id="runPipeline">Run Pipeline</button>
-          <span class="small muted" id="pipelineStatus">Idle.</span>
-        </div>
-        <div class="small muted">Runs: scrape → ingest → extract → score → dedupe → expire.</div>
       </section>
 
       <section class="panel">
@@ -391,9 +386,11 @@
         createProject: document.getElementById("createProject"),
         addSource: document.getElementById("addSource"),
         scrapeAll: document.getElementById("scrapeAll"),
+        scrapeAllSpinner: document.getElementById("scrapeAllSpinner"),
         checkAll: document.getElementById("checkAll"),
         checkAllSpinner: document.getElementById("checkAllSpinner"),
         runPipeline: document.getElementById("runPipeline"),
+        runPipelineSpinner: document.getElementById("runPipelineSpinner"),
         pipelineStatus: document.getElementById("pipelineStatus"),
         refreshArticles: document.getElementById("refreshArticles"),
         saveYoutube: document.getElementById("saveYoutube"),
@@ -589,8 +586,18 @@
 
       async function scrapeAll() {
         if (!state.currentProject) return;
-        await api(`/api/projects/${state.currentProject.id}/scrape`, { method: "POST" });
-        await loadSources();
+        dom.scrapeAll.disabled = true;
+        dom.scrapeAllSpinner.classList.remove("hidden");
+        const originalLabel = dom.scrapeAll.textContent;
+        dom.scrapeAll.textContent = "Scraping...";
+        try {
+          await api(`/api/projects/${state.currentProject.id}/scrape`, { method: "POST" });
+        } finally {
+          dom.scrapeAll.disabled = false;
+          dom.scrapeAllSpinner.classList.add("hidden");
+          dom.scrapeAll.textContent = originalLabel;
+          await loadSources();
+        }
       }
 
       async function scrapeSource(sourceId) {
@@ -638,6 +645,7 @@
       async function runPipeline() {
         if (!state.currentProject) return;
         dom.runPipeline.disabled = true;
+        dom.runPipelineSpinner.classList.remove("hidden");
         const status = dom.pipelineStatus;
         status.textContent = "Running pipeline...";
         try {
@@ -645,12 +653,13 @@
             method: "POST"
           });
           const r = result.results || {};
-          status.textContent = `Done. ingest=${r.ingest || 0}, extract=${r.extract || 0}, judge=${r.judge || 0}, dedupe=${r.dedupe || 0}, unusable=${r.unusable || 0}.`;
+          status.textContent = `Done. ingest=${r.ingest || 0}, extract=${r.extract || 0}, judge=${r.judge || 0}, dedupe=${r.dedupe || 0}, unusable=${r.unusable || 0}. Check Articles & Scores.`;
         } catch (err) {
           console.error(err);
           status.textContent = "Pipeline failed. Check server logs.";
         } finally {
           dom.runPipeline.disabled = false;
+          dom.runPipelineSpinner.classList.add("hidden");
           await Promise.all([loadSources(), loadArticles()]);
         }
       }
