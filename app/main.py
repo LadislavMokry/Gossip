@@ -12,8 +12,10 @@ from .admin import (
     delete_project,
     delete_source,
     check_source_access,
+    ingest_source_items,
     get_source,
     get_youtube_account,
+    list_articles,
     list_projects,
     list_source_items,
     list_sources,
@@ -37,6 +39,10 @@ from .media.audio import render_audio_roundup
 from .pipeline import (
     fetch_latest_audio_roundup,
     run_audio_roundup,
+    dedupe_articles,
+    mark_low_score_unusable,
+    run_extraction,
+    run_first_judge,
     update_post_media,
 )
 
@@ -54,6 +60,8 @@ class ProjectCreate(BaseModel):
     description: str | None = None
     language: str | None = None
     generation_interval_hours: int | None = None
+    unusable_score_threshold: int | None = None
+    unusable_age_hours: int | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -62,6 +70,8 @@ class ProjectUpdate(BaseModel):
     language: str | None = None
     generation_interval_hours: int | None = None
     last_generated_at: str | None = None
+    unusable_score_threshold: int | None = None
+    unusable_age_hours: int | None = None
 
 
 class SourceCreate(BaseModel):
@@ -143,11 +153,17 @@ def api_create_project(payload: ProjectCreate) -> dict:
         raise HTTPException(status_code=400, detail="name is required")
     if payload.generation_interval_hours is not None and payload.generation_interval_hours <= 0:
         raise HTTPException(status_code=400, detail="generation_interval_hours must be > 0")
+    if payload.unusable_age_hours is not None and payload.unusable_age_hours <= 0:
+        raise HTTPException(status_code=400, detail="unusable_age_hours must be > 0")
+    if payload.unusable_score_threshold is not None and not (1 <= payload.unusable_score_threshold <= 10):
+        raise HTTPException(status_code=400, detail="unusable_score_threshold must be 1-10")
     return create_project(
         payload.name,
         payload.description,
         payload.language,
         payload.generation_interval_hours,
+        payload.unusable_score_threshold,
+        payload.unusable_age_hours,
     )
 
 
@@ -155,6 +171,10 @@ def api_create_project(payload: ProjectCreate) -> dict:
 def api_update_project(project_id: str, payload: ProjectUpdate) -> dict:
     if payload.generation_interval_hours is not None and payload.generation_interval_hours <= 0:
         raise HTTPException(status_code=400, detail="generation_interval_hours must be > 0")
+    if payload.unusable_age_hours is not None and payload.unusable_age_hours <= 0:
+        raise HTTPException(status_code=400, detail="unusable_age_hours must be > 0")
+    if payload.unusable_score_threshold is not None and not (1 <= payload.unusable_score_threshold <= 10):
+        raise HTTPException(status_code=400, detail="unusable_score_threshold must be 1-10")
     return update_project(project_id, payload.model_dump())
 
 
@@ -208,9 +228,27 @@ def api_scrape_source(source_id: str, max_items: int = Query(10, ge=1, le=50)) -
     return {"status": "ok", "result": result.__dict__}
 
 
+@app.post("/api/projects/{project_id}/pipeline")
+def api_run_pipeline(project_id: str) -> dict:
+    results: dict = {}
+    scrape_results = scrape_project(project_id, max_items=10)
+    results["scrape"] = [r.__dict__ for r in scrape_results]
+    results["ingest"] = ingest_source_items(limit=50, fetch_full=True, project_id=project_id)
+    results["extract"] = run_extraction(limit=20, project_id=project_id)
+    results["judge"] = run_first_judge(limit=50, project_id=project_id)
+    results["dedupe"] = dedupe_articles(project_id)
+    results["unusable"] = mark_low_score_unusable(project_id)
+    return {"status": "ok", "results": results}
+
+
 @app.get("/api/sources/{source_id}/items")
 def api_list_source_items(source_id: str, limit: int = Query(10, ge=1, le=50)) -> list[dict]:
     return list_source_items(source_id, limit=limit)
+
+
+@app.get("/api/projects/{project_id}/articles")
+def api_list_articles(project_id: str, limit: int = Query(50, ge=1, le=200)) -> list[dict]:
+    return list_articles(project_id, limit=limit)
 
 
 @app.post("/api/sources/{source_id}/check-access")

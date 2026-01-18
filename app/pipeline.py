@@ -1,4 +1,6 @@
 from datetime import datetime, timezone, timedelta
+import hashlib
+import re
 
 from app.ai.audio_roundup import generate_audio_roundup
 from app.ai.extract import extract_summary
@@ -13,20 +15,35 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_unprocessed(limit: int = 20) -> list[dict]:
+def _content_hash(text: str | None) -> str | None:
+    if not text:
+        return None
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def fetch_unprocessed(limit: int = 20, project_id: str | None = None) -> list[dict]:
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("articles")
-        .select("id, raw_html, title, source_url")
+        .select("id, raw_html, title, source_url, content_hash")
         .eq("processed", False)
         .limit(limit)
-        .execute()
     )
+    if project_id:
+        query = query.eq("project_id", project_id)
+    resp = query.execute()
     return resp.data or []
 
 
 def mark_processed(
-    article_id: str, summary: str, title: str | None = None, content: str | None = None
+    article_id: str,
+    summary: str,
+    title: str | None = None,
+    content: str | None = None,
+    content_hash: str | None = None,
 ) -> None:
     sb = get_supabase()
     update = {"summary": summary, "processed": True, "scraped_at": _now()}
@@ -34,11 +51,13 @@ def mark_processed(
         update["title"] = title
     if content:
         update["content"] = content
+    if content_hash:
+        update["content_hash"] = content_hash
     sb.table("articles").update(update).eq("id", article_id).execute()
 
 
-def run_extraction(limit: int = 3) -> int:
-    items = fetch_unprocessed(limit=limit)
+def run_extraction(limit: int = 3, project_id: str | None = None) -> int:
+    items = fetch_unprocessed(limit=limit, project_id=project_id)
     count = 0
     for item in items:
         raw = item.get("raw_html") or ""
@@ -48,22 +67,25 @@ def run_extraction(limit: int = 3) -> int:
         summary = result.get("summary") or ""
         title = result.get("title")
         content = result.get("content")
+        content_hash = item.get("content_hash") or _content_hash(content or raw)
         if summary:
-            mark_processed(item["id"], summary, title, content)
+            mark_processed(item["id"], summary, title, content, content_hash)
             count += 1
     return count
 
 
-def fetch_unscored(limit: int = 20) -> list[dict]:
+def fetch_unscored(limit: int = 20, project_id: str | None = None) -> list[dict]:
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("articles")
         .select("id, summary")
         .eq("processed", True)
         .eq("scored", False)
         .limit(limit)
-        .execute()
     )
+    if project_id:
+        query = query.eq("project_id", project_id)
+    resp = query.execute()
     return resp.data or []
 
 
@@ -78,9 +100,9 @@ def mark_scored(article_id: str, score: int, formats: list[str]) -> None:
     ).eq("id", article_id).execute()
 
 
-def run_first_judge(limit: int = 20) -> int:
+def run_first_judge(limit: int = 20, project_id: str | None = None) -> int:
     settings = get_settings()
-    items = fetch_unscored(limit=limit)
+    items = fetch_unscored(limit=limit, project_id=project_id)
     count = 0
     for item in items:
         summary = item.get("summary") or ""
@@ -94,15 +116,18 @@ def run_first_judge(limit: int = 20) -> int:
     return count
 
 
-def fetch_ready_for_generation(limit: int = 10) -> list[dict]:
+def fetch_ready_for_generation(limit: int = 10, project_id: str | None = None) -> list[dict]:
     sb = get_supabase()
-    resp = (
+    query = (
         sb.table("articles")
         .select("id, content, judge_score")
         .eq("scored", True)
+        .eq("unusable", False)
         .limit(limit)
-        .execute()
     )
+    if project_id:
+        query = query.eq("project_id", project_id)
+    resp = query.execute()
     return resp.data or []
 
 
@@ -132,13 +157,13 @@ def insert_video_post(article_id: str, model: str, content: dict) -> int:
     return len(resp.data or [])
 
 
-def run_generation(limit: int = 10) -> int:
+def run_generation(limit: int = 10, project_id: str | None = None) -> int:
     settings = get_settings()
     models = generation_models()
     if not models:
         return 0
     model = models[0]
-    items = fetch_ready_for_generation(limit=limit)
+    items = fetch_ready_for_generation(limit=limit, project_id=project_id)
     count = 0
     for item in items:
         if has_video_posts(item["id"]):
@@ -152,6 +177,98 @@ def run_generation(limit: int = 10) -> int:
         for variant_id in range(1, settings.generation_variants + 1):
             variant = generate_video_variant(content, model, variant_id)
             count += insert_video_post(item["id"], model, variant)
+    return count
+
+
+def _project_thresholds(project_id: str | None) -> tuple[int, int]:
+    if not project_id:
+        return (5, 48)
+    sb = get_supabase()
+    resp = (
+        sb.table("projects")
+        .select("unusable_score_threshold, unusable_age_hours")
+        .eq("id", project_id)
+        .limit(1)
+        .execute()
+    )
+    data = resp.data or []
+    if not data:
+        return (5, 48)
+    row = data[0]
+    score = int(row.get("unusable_score_threshold") or 5)
+    hours = int(row.get("unusable_age_hours") or 48)
+    return (score, hours)
+
+
+def mark_low_score_unusable(project_id: str) -> int:
+    sb = get_supabase()
+    score_threshold, age_hours = _project_thresholds(project_id)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=age_hours)
+    items = (
+        sb.table("articles")
+        .select("id, judge_score, scraped_at")
+        .eq("project_id", project_id)
+        .eq("scored", True)
+        .eq("unusable", False)
+        .lt("judge_score", score_threshold)
+        .lt("scraped_at", cutoff.isoformat())
+        .execute()
+        .data
+        or []
+    )
+    count = 0
+    for item in items:
+        sb.table("articles").update(
+            {
+                "unusable": True,
+                "unusable_reason": f"low_score_age(score<{score_threshold},>{age_hours}h)",
+                "unusable_at": _now(),
+            }
+        ).eq("id", item["id"]).execute()
+        count += 1
+    return count
+
+
+def dedupe_articles(project_id: str) -> int:
+    sb = get_supabase()
+    items = (
+        sb.table("articles")
+        .select("id, content_hash, judge_score, scraped_at, unusable")
+        .eq("project_id", project_id)
+        .eq("unusable", False)
+        .neq("content_hash", None)
+        .execute()
+        .data
+        or []
+    )
+    if not items:
+        return 0
+    groups: dict[str, list[dict]] = {}
+    for item in items:
+        h = item.get("content_hash")
+        if not h:
+            continue
+        groups.setdefault(h, []).append(item)
+    count = 0
+    for h, group in groups.items():
+        if len(group) <= 1:
+            continue
+        def key(row: dict) -> tuple[int, str]:
+            score = int(row.get("judge_score") or 0)
+            scraped = row.get("scraped_at") or ""
+            return (score, scraped)
+        group_sorted = sorted(group, key=key, reverse=True)
+        keep = group_sorted[0]
+        for dup in group_sorted[1:]:
+            sb.table("articles").update(
+                {
+                    "unusable": True,
+                    "unusable_reason": "duplicate",
+                    "duplicate_of": keep["id"],
+                    "unusable_at": _now(),
+                }
+            ).eq("id", dup["id"]).execute()
+            count += 1
     return count
 
 
@@ -231,23 +348,43 @@ def run_second_judge(limit: int = 20) -> int:
     return count
 
 
-def fetch_for_audio_roundup(limit: int = 5, hours: int = 24) -> list[dict]:
+def fetch_for_audio_roundup(
+    limit: int = 5, hours: int = 24, project_id: str | None = None
+) -> list[dict]:
     sb = get_supabase()
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
-    resp = (
+    query = (
         sb.table("articles")
         .select("id, title, summary, judge_score, scraped_at")
         .eq("processed", True)
         .eq("scored", True)
+        .eq("unusable", False)
         .gte("scraped_at", since.isoformat())
         .order("judge_score", desc=True)
-        .limit(limit)
-        .execute()
+        .limit(limit * 3)
     )
-    return resp.data or []
+    if project_id:
+        query = query.eq("project_id", project_id)
+    query = query.is_("duplicate_of", "null")
+    items = query.execute().data or []
+    if not items:
+        return []
+    article_ids = [i["id"] for i in items]
+    usage = (
+        sb.table("article_usage")
+        .select("article_id")
+        .in_("article_id", article_ids)
+        .eq("usage_type", "audio_roundup")
+        .execute()
+        .data
+        or []
+    )
+    used_ids = {u["article_id"] for u in usage if u.get("article_id")}
+    filtered = [i for i in items if i["id"] not in used_ids]
+    return filtered[:limit]
 
 
-def insert_audio_roundup(model: str, content: dict) -> int:
+def insert_audio_roundup(model: str, content: dict) -> dict | None:
     sb = get_supabase()
     row = {
         "article_id": None,
@@ -257,7 +394,8 @@ def insert_audio_roundup(model: str, content: dict) -> int:
         "content": content,
     }
     resp = sb.table("posts").insert(row).execute()
-    return len(resp.data or [])
+    data = resp.data or []
+    return data[0] if data else None
 
 
 def _project_language(project_id: str) -> str | None:
@@ -278,7 +416,7 @@ def run_audio_roundup(project_id: str | None = None, language: str | None = None
     if project_id and not language:
         language = _project_language(project_id)
     items = fetch_for_audio_roundup(
-        limit=settings.audio_roundup_size, hours=settings.audio_roundup_hours
+        limit=settings.audio_roundup_size, hours=settings.audio_roundup_hours, project_id=project_id
     )
     if not items:
         return 0
@@ -287,7 +425,22 @@ def run_audio_roundup(project_id: str | None = None, language: str | None = None
         for item in items
     ]
     content = generate_audio_roundup(stories, language=language)
-    return insert_audio_roundup(settings.audio_roundup_model, content)
+    post = insert_audio_roundup(settings.audio_roundup_model, content)
+    if post:
+        usage_rows = [
+            {
+                "article_id": item.get("id"),
+                "usage_type": "audio_roundup",
+                "post_id": post.get("id"),
+            }
+            for item in items
+            if item.get("id")
+        ]
+        if usage_rows:
+            sb = get_supabase()
+            sb.table("article_usage").insert(usage_rows).execute()
+        return 1
+    return 0
 
 
 def fetch_latest_audio_roundup() -> dict | None:

@@ -8,6 +8,7 @@
 
 CREATE TABLE IF NOT EXISTS articles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
   source_url TEXT NOT NULL UNIQUE,
   source_website TEXT NOT NULL,
   title TEXT,
@@ -16,6 +17,11 @@ CREATE TABLE IF NOT EXISTS articles (
   summary TEXT,
   judge_score INTEGER,
   format_assignments JSONB DEFAULT '[]'::jsonb,
+  content_hash TEXT,
+  duplicate_of UUID REFERENCES articles(id) ON DELETE SET NULL,
+  unusable BOOLEAN DEFAULT FALSE,
+  unusable_reason TEXT,
+  unusable_at TIMESTAMP WITH TIME ZONE,
   processed BOOLEAN DEFAULT FALSE,
   scored BOOLEAN DEFAULT FALSE,
   scraped_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -35,6 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_articles_scraped_at
 CREATE INDEX IF NOT EXISTS idx_articles_source_website
   ON articles(source_website);
 
+
 -- Comments for documentation
 COMMENT ON TABLE articles IS 'Stores ingested content (manual uploads or scraped pages)';
 COMMENT ON COLUMN articles.source_url IS 'Original URL or manual identifier (UNIQUE constraint prevents duplicates)';
@@ -45,6 +52,10 @@ COMMENT ON COLUMN articles.judge_score IS 'First Judge score (1-10, NULL if not 
 COMMENT ON COLUMN articles.format_assignments IS 'JSONB array of assigned formats: ["headline", "carousel", "video", "podcast"]';
 COMMENT ON COLUMN articles.processed IS 'TRUE after extraction (summary generated)';
 COMMENT ON COLUMN articles.scored IS 'TRUE after first judge scoring';
+COMMENT ON COLUMN articles.content_hash IS 'Hash of normalized article content for dedupe';
+COMMENT ON COLUMN articles.duplicate_of IS 'Reference to canonical article when deduped';
+COMMENT ON COLUMN articles.unusable IS 'TRUE if content is too old/low score/duplicate';
+COMMENT ON COLUMN articles.unusable_reason IS 'Reason for marking unusable';
 
 -- ============================================================
 -- TABLE 1A: category_pages
@@ -238,6 +249,8 @@ CREATE TABLE IF NOT EXISTS projects (
   description TEXT,
   language TEXT DEFAULT 'en',
   generation_interval_hours INTEGER DEFAULT 12,
+  unusable_score_threshold INTEGER DEFAULT 5,
+  unusable_age_hours INTEGER DEFAULT 48,
   last_generated_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -247,6 +260,8 @@ COMMENT ON TABLE projects IS 'User-defined content projects (topics)';
 COMMENT ON COLUMN projects.language IS 'Language code for generation (e.g. en, es, sk)';
 COMMENT ON COLUMN projects.generation_interval_hours IS 'How often to generate content (hours)';
 COMMENT ON COLUMN projects.last_generated_at IS 'Last time generation ran for this project';
+COMMENT ON COLUMN projects.unusable_score_threshold IS 'Score below this becomes unusable after age window';
+COMMENT ON COLUMN projects.unusable_age_hours IS 'Age window (hours) for low-score content to be unusable';
 
 -- TABLE 6: sources
 -- RSS feeds, pages, or other source types per project
@@ -292,6 +307,21 @@ CREATE INDEX IF NOT EXISTS idx_source_items_scraped_at ON source_items(scraped_a
 
 COMMENT ON TABLE source_items IS 'Latest scraped items for each source';
 
+-- TABLE 7A: article_usage
+-- Tracks when an article is used in downstream content (e.g., audio roundup)
+CREATE TABLE IF NOT EXISTS article_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  article_id UUID REFERENCES articles(id) ON DELETE CASCADE,
+  usage_type TEXT NOT NULL,
+  post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
+  used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_article_usage_article_id ON article_usage(article_id);
+CREATE INDEX IF NOT EXISTS idx_article_usage_usage_type ON article_usage(usage_type);
+
+COMMENT ON TABLE article_usage IS 'Tracks usage of articles in downstream content';
+
 -- TABLE 8: youtube_accounts
 -- Stores OAuth refresh tokens per project (server-side use only)
 CREATE TABLE IF NOT EXISTS youtube_accounts (
@@ -316,6 +346,52 @@ ALTER TABLE IF EXISTS projects
 
 ALTER TABLE IF EXISTS projects
   ADD COLUMN IF NOT EXISTS generation_interval_hours INTEGER DEFAULT 12;
+
+ALTER TABLE IF EXISTS projects
+  ADD COLUMN IF NOT EXISTS unusable_score_threshold INTEGER DEFAULT 5;
+
+ALTER TABLE IF EXISTS projects
+  ADD COLUMN IF NOT EXISTS unusable_age_hours INTEGER DEFAULT 48;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS content_hash TEXT;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS duplicate_of UUID REFERENCES articles(id) ON DELETE SET NULL;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS unusable BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS unusable_reason TEXT;
+
+ALTER TABLE IF EXISTS articles
+  ADD COLUMN IF NOT EXISTS unusable_at TIMESTAMP WITH TIME ZONE;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'articles' AND column_name = 'project_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_articles_project_id ON articles(project_id);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'articles' AND column_name = 'content_hash'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_articles_content_hash ON articles(content_hash);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'articles' AND column_name = 'unusable'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_articles_unusable ON articles(unusable) WHERE unusable = TRUE;
+  END IF;
+END $$;
 
 ALTER TABLE IF EXISTS projects
   ADD COLUMN IF NOT EXISTS last_generated_at TIMESTAMP WITH TIME ZONE;

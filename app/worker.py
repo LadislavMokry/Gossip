@@ -48,6 +48,7 @@ def main() -> None:
     sub.add_parser("scrape-articles", help="Scrape full articles from URLs")
     ingest_sources = sub.add_parser("ingest-sources", help="Ingest source items into articles")
     ingest_sources.add_argument("--limit", type=int, default=20, help="Max source items to ingest")
+    ingest_sources.add_argument("--project-id", type=str, default=None, help="Project ID filter")
     ingest_sources.add_argument(
         "--no-fetch", action="store_true", help="Use stored excerpts without fetching full pages"
     )
@@ -94,7 +95,7 @@ def main() -> None:
         print(f"articles_scraped={count}")
         return
     if args.command == "ingest-sources":
-        count = ingest_source_items(limit=args.limit, fetch_full=not args.no_fetch)
+        count = ingest_source_items(limit=args.limit, fetch_full=not args.no_fetch, project_id=args.project_id)
         print(f"ingested_sources={count}")
         return
 

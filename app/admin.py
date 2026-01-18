@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from html import unescape
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse, parse_qsl, urlsplit, urlunsplit
+import hashlib
+import re
 
 import feedparser
 import requests
@@ -44,6 +46,15 @@ def _truncate(value: str, max_chars: int = MAX_CONTENT_CHARS) -> str:
     if len(value) <= max_chars:
         return value
     return value[:max_chars].rsplit(" ", 1)[0]
+
+
+def _content_hash(text: str) -> str | None:
+    if not text:
+        return None
+    normalized = re.sub(r"\s+", " ", text.strip().lower())
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def _looks_like_media(url: str) -> bool:
@@ -237,6 +248,8 @@ def create_project(
     description: str | None = None,
     language: str | None = None,
     generation_interval_hours: int | None = None,
+    unusable_score_threshold: int | None = None,
+    unusable_age_hours: int | None = None,
 ) -> dict:
     sb = get_supabase()
     row = {
@@ -249,6 +262,10 @@ def create_project(
         row["language"] = language.strip()
     if generation_interval_hours is not None:
         row["generation_interval_hours"] = generation_interval_hours
+    if unusable_score_threshold is not None:
+        row["unusable_score_threshold"] = unusable_score_threshold
+    if unusable_age_hours is not None:
+        row["unusable_age_hours"] = unusable_age_hours
     res = sb.table("projects").insert(row).execute()
     return (res.data or [row])[0]
 
@@ -334,6 +351,39 @@ def list_source_items(source_id: str, limit: int = 10) -> list[dict]:
         .execute()
     )
     return res.data or []
+
+
+def list_articles(project_id: str, limit: int = 50) -> list[dict]:
+    sb = get_supabase()
+    items = (
+        sb.table("articles")
+        .select(
+            "id, title, judge_score, scraped_at, processed, scored, unusable, unusable_reason, duplicate_of"
+        )
+        .eq("project_id", project_id)
+        .order("judge_score", desc=True)
+        .order("scraped_at", desc=True)
+        .limit(limit)
+        .execute()
+        .data
+        or []
+    )
+    if not items:
+        return []
+    article_ids = [i["id"] for i in items]
+    usage = (
+        sb.table("article_usage")
+        .select("article_id")
+        .in_("article_id", article_ids)
+        .eq("usage_type", "audio_roundup")
+        .execute()
+        .data
+        or []
+    )
+    used_ids = {u["article_id"] for u in usage if u.get("article_id")}
+    for item in items:
+        item["used_in_audio"] = item["id"] in used_ids
+    return items
 
 
 def get_youtube_account(project_id: str) -> dict | None:
@@ -561,18 +611,31 @@ def _source_website(url: str) -> str:
     return urlparse(url).netloc or "unknown"
 
 
-def ingest_source_items(limit: int = 20, fetch_full: bool = True) -> int:
+def ingest_source_items(limit: int = 20, fetch_full: bool = True, project_id: str | None = None) -> int:
     settings = get_settings()
     sb = get_supabase()
-    items = (
+    source_filter: list[str] | None = None
+    if project_id:
+        sources = (
+            sb.table("sources")
+            .select("id")
+            .eq("project_id", project_id)
+            .execute()
+            .data
+            or []
+        )
+        source_filter = [s["id"] for s in sources if s.get("id")]
+        if not source_filter:
+            return 0
+    query = (
         sb.table("source_items")
         .select("id, source_id, title, url, content, raw, published_at, scraped_at")
         .order("scraped_at", desc=True)
         .limit(limit)
-        .execute()
-        .data
-        or []
     )
+    if source_filter:
+        query = query.in_("source_id", source_filter)
+    items = query.execute().data or []
     if not items:
         return 0
 
@@ -581,7 +644,7 @@ def ingest_source_items(limit: int = 20, fetch_full: bool = True) -> int:
     if source_ids:
         sources = (
             sb.table("sources")
-            .select("id, name, config")
+            .select("id, name, config, project_id")
             .in_("id", list({sid for sid in source_ids}))
             .execute()
             .data
@@ -625,9 +688,11 @@ def ingest_source_items(limit: int = 20, fetch_full: bool = True) -> int:
         row = {
             "source_url": url,
             "source_website": _source_website(url),
+            "project_id": source.get("project_id"),
             "title": item.get("title"),
             "raw_html": raw_text,
             "content": raw_text,
+            "content_hash": _content_hash(raw_text),
             "scraped_at": item.get("scraped_at") or _now_iso(),
             "processed": False,
             "scored": False,

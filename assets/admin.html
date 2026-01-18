@@ -233,6 +233,23 @@
             placeholder="Generate hrs"
             style="max-width: 140px;"
           />
+          <input
+            id="projectUnusableScore"
+            type="number"
+            min="1"
+            max="10"
+            step="1"
+            placeholder="Unusable score <"
+            style="max-width: 170px;"
+          />
+          <input
+            id="projectUnusableAge"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Unusable age hrs"
+            style="max-width: 170px;"
+          />
           <button class="secondary" id="saveProject">Save Settings</button>
           <button class="secondary" id="deleteProject">Delete Project</button>
         </div>
@@ -285,10 +302,39 @@
       </section>
 
       <section class="panel">
+        <h2>Pipeline</h2>
+        <div class="row">
+          <button class="primary" id="runPipeline">Run Pipeline</button>
+          <span class="small muted" id="pipelineStatus">Idle.</span>
+        </div>
+        <div class="small muted">Runs: scrape → ingest → extract → score → dedupe → expire.</div>
+      </section>
+
+      <section class="panel">
         <h2>Latest Items</h2>
         <div class="items" id="items">
           <div class="muted small">Click “View” on a source to expand items inline.</div>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2>Articles & Scores</h2>
+        <div class="row">
+          <button class="secondary" id="refreshArticles">Refresh</button>
+          <span class="small muted">Sorted by score (unused first).</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Score</th>
+              <th>Age</th>
+              <th>Status</th>
+              <th>Used</th>
+            </tr>
+          </thead>
+          <tbody id="articles"></tbody>
+        </table>
       </section>
 
       <section class="panel">
@@ -327,6 +373,8 @@
         projectName: document.getElementById("projectName"),
         projectLanguage: document.getElementById("projectLanguage"),
         projectGenInterval: document.getElementById("projectGenInterval"),
+        projectUnusableScore: document.getElementById("projectUnusableScore"),
+        projectUnusableAge: document.getElementById("projectUnusableAge"),
         projectLabel: document.getElementById("projectLabel"),
         sources: document.getElementById("sources"),
         sourceName: document.getElementById("sourceName"),
@@ -334,6 +382,7 @@
         sourceUrl: document.getElementById("sourceUrl"),
         sourceInterval: document.getElementById("sourceInterval"),
         items: document.getElementById("items"),
+        articles: document.getElementById("articles"),
         ytChannel: document.getElementById("ytChannel"),
         ytToken: document.getElementById("ytToken"),
         ytStatus: document.getElementById("ytStatus"),
@@ -344,6 +393,9 @@
         scrapeAll: document.getElementById("scrapeAll"),
         checkAll: document.getElementById("checkAll"),
         checkAllSpinner: document.getElementById("checkAllSpinner"),
+        runPipeline: document.getElementById("runPipeline"),
+        pipelineStatus: document.getElementById("pipelineStatus"),
+        refreshArticles: document.getElementById("refreshArticles"),
         saveYoutube: document.getElementById("saveYoutube"),
         saveProject: document.getElementById("saveProject"),
         deleteProject: document.getElementById("deleteProject"),
@@ -391,6 +443,27 @@
           return undefined;
         }
         return parsed;
+      }
+
+      function parseScore(raw, label) {
+        if (raw === "") return null;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 10) {
+          alert(`${label} must be between 1 and 10.`);
+          return undefined;
+        }
+        return parsed;
+      }
+
+      function ageLabel(value) {
+        if (!value) return "-";
+        const dt = new Date(value);
+        if (Number.isNaN(dt.getTime())) return "-";
+        const diffMs = Date.now() - dt.getTime();
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        if (hours < 24) return `${hours}h`;
+        const days = Math.floor(hours / 24);
+        return `${days}d`;
       }
 
       function renderProjects() {
@@ -451,11 +524,12 @@
         renderProjects();
         if (state.currentProject) {
           dom.projectLabel.textContent = state.currentProject.name;
-          await Promise.all([loadSources(), loadYoutube()]);
+          await Promise.all([loadSources(), loadYoutube(), loadArticles()]);
         } else {
           dom.projectLabel.textContent = "No project selected";
           dom.sources.innerHTML = "";
           closeInlinePanels();
+          dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No project selected.</td></tr>";
         }
       }
 
@@ -467,8 +541,10 @@
           : "en";
         dom.projectLanguage.value = langValue;
         dom.projectGenInterval.value = project.generation_interval_hours || "";
+        dom.projectUnusableScore.value = project.unusable_score_threshold || "";
+        dom.projectUnusableAge.value = project.unusable_age_hours || "";
         renderProjects();
-        await Promise.all([loadSources(), loadYoutube()]);
+        await Promise.all([loadSources(), loadYoutube(), loadArticles()]);
       }
 
       async function loadSources() {
@@ -559,6 +635,26 @@
         }
       }
 
+      async function runPipeline() {
+        if (!state.currentProject) return;
+        dom.runPipeline.disabled = true;
+        const status = dom.pipelineStatus;
+        status.textContent = "Running pipeline...";
+        try {
+          const result = await api(`/api/projects/${state.currentProject.id}/pipeline`, {
+            method: "POST"
+          });
+          const r = result.results || {};
+          status.textContent = `Done. ingest=${r.ingest || 0}, extract=${r.extract || 0}, judge=${r.judge || 0}, dedupe=${r.dedupe || 0}, unusable=${r.unusable || 0}.`;
+        } catch (err) {
+          console.error(err);
+          status.textContent = "Pipeline failed. Check server logs.";
+        } finally {
+          dom.runPipeline.disabled = false;
+          await Promise.all([loadSources(), loadArticles()]);
+        }
+      }
+
       async function editSource(sourceId) {
         const current = state.sources.find((s) => s.id === sourceId);
         const value = prompt(
@@ -637,6 +733,51 @@
           row.innerHTML = `<td colspan="8">${buildItemsPanel(items)}</td>`;
         }
         currentRow.parentNode.insertBefore(row, currentRow.nextSibling);
+      }
+
+      function renderArticles(rows) {
+        dom.articles.innerHTML = "";
+        if (!rows.length) {
+          dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No articles yet.</td></tr>";
+          return;
+        }
+        const sorted = [...rows].sort((a, b) => {
+          const usedA = a.used_in_audio ? 1 : 0;
+          const usedB = b.used_in_audio ? 1 : 0;
+          if (usedA !== usedB) return usedA - usedB;
+          const scoreA = Number(a.judge_score || 0);
+          const scoreB = Number(b.judge_score || 0);
+          if (scoreA !== scoreB) return scoreB - scoreA;
+          const dateA = new Date(a.scraped_at || 0).getTime();
+          const dateB = new Date(b.scraped_at || 0).getTime();
+          return dateB - dateA;
+        });
+        sorted.forEach((a) => {
+          const tr = document.createElement("tr");
+          const title = escapeHtml(a.title || "Untitled");
+          const score = a.judge_score ?? "-";
+          const status = a.unusable
+            ? `unusable${a.unusable_reason ? ` (${escapeHtml(a.unusable_reason)})` : ""}`
+            : a.scored
+              ? "scored"
+              : a.processed
+                ? "processed"
+                : "new";
+          tr.innerHTML = `
+            <td>${title}</td>
+            <td class="small">${score}</td>
+            <td class="small">${ageLabel(a.scraped_at)}</td>
+            <td class="small">${status}</td>
+            <td class="small">${a.used_in_audio ? "audio" : "-"}</td>
+          `;
+          dom.articles.appendChild(tr);
+        });
+      }
+
+      async function loadArticles() {
+        if (!state.currentProject) return;
+        const rows = await api(`/api/projects/${state.currentProject.id}/articles?limit=200`);
+        renderArticles(rows || []);
       }
 
       function buildAuthPanel(source) {
@@ -798,11 +939,19 @@
         const genRaw = dom.projectGenInterval.value.trim();
         const genInterval = parsePositiveNumber(genRaw, "Generation interval");
         if (genInterval === undefined) return;
+        const scoreRaw = dom.projectUnusableScore.value.trim();
+        const unusableScore = parseScore(scoreRaw, "Unusable score threshold");
+        if (unusableScore === undefined) return;
+        const ageRaw = dom.projectUnusableAge.value.trim();
+        const unusableAge = parsePositiveNumber(ageRaw, "Unusable age hours");
+        if (unusableAge === undefined) return;
         await api(`/api/projects/${state.currentProject.id}`, {
           method: "PATCH",
           body: JSON.stringify({
             language: language || null,
-            generation_interval_hours: genInterval
+            generation_interval_hours: genInterval,
+            unusable_score_threshold: unusableScore,
+            unusable_age_hours: unusableAge
           })
         });
         await loadProjects();
@@ -818,7 +967,10 @@
         dom.projectLabel.textContent = "No project selected";
         dom.projectLanguage.value = "";
         dom.projectGenInterval.value = "";
+        dom.projectUnusableScore.value = "";
+        dom.projectUnusableAge.value = "";
         closeInlinePanels();
+        dom.articles.innerHTML = "<tr><td colspan='5' class='small muted'>No project selected.</td></tr>";
         await loadProjects();
       }
 
@@ -848,12 +1000,14 @@
       dom.addSource.onclick = addSource;
       dom.scrapeAll.onclick = scrapeAll;
       dom.checkAll.onclick = checkAllSources;
+      dom.runPipeline.onclick = runPipeline;
       dom.saveYoutube.onclick = saveYoutube;
       dom.saveProject.onclick = saveProjectSettings;
       dom.deleteProject.onclick = deleteProject;
       dom.generateRoundup.onclick = generateRoundup;
       dom.renderRoundup.onclick = renderRoundup;
       dom.refresh.onclick = loadProjects;
+      dom.refreshArticles.onclick = loadArticles;
 
       document.addEventListener("click", (event) => {
         if (!state.currentSource && !state.currentAuthSource) return;
