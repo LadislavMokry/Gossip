@@ -72,7 +72,15 @@ Update Notice (2026-01-05): Video-first scope (shorts + audio roundup). Multi-fo
 
 ### Phase 4: Publishing (Planned)
 - [ ] Define platforms + credentials
+- [ ] Create platform accounts per topic (YouTube channels, TikTok accounts, Instagram/Facebook pages)
 - [ ] Build posting workers (rate-limited)
+
+### Launch Topics (Initial 5)
+- [ ] Celebrities / Entertainment
+- [ ] TV & Streaming Recaps
+- [ ] Sports (results + storylines)
+- [ ] Viral / Human-interest
+- [ ] Nostalgia / Pop-culture history
 
 ### Phase 5: Monitoring (Planned)
 - [ ] Add logging + basic metrics
