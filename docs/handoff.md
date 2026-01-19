@@ -6,6 +6,7 @@ Last updated: 2026-01-19
 2. Add scheduling (daily runs per project; retries + basic logging).
 3. Create platform accounts (YouTube channels per topic; optional Meta pages + TikTok accounts).
 4. Connect metrics (start with YouTube analytics; add Meta/TikTok later).
+5. Evaluate alt LLM providers for script quality/virality (Claude, xAI, Gemini).
 
 ## Current launch configuration
 - Topics (EN-only for now):
