@@ -46,6 +46,7 @@ Last updated: 2026-01-19
 4. Implement auto-scheduling for pipeline + audio roundup (set-and-forget).
 5. Test generating + plan automation for uploading and post-performance stats ingestion.
 6. Brainstorm social strategy + monetization plan; plan how to automate social account setup (or decide manual process).
+7. Add API cost tracking to `/stats` (start with OpenAI usage/costs; keep extensible for future providers).
 
 ## Summary of this session (2026-01-17, later)
 - Admin UI JS refactor: cached DOM refs, event delegation for source actions, shared helpers, and safer HTML rendering.
