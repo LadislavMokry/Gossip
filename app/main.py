@@ -46,10 +46,7 @@ from .media.paths import (
 from .pipeline import (
     fetch_latest_audio_roundup,
     run_audio_roundup,
-    dedupe_articles,
-    mark_low_score_unusable,
-    run_extraction,
-    run_first_judge,
+    run_project_pipeline,
     update_post_media,
 )
 
@@ -246,28 +243,7 @@ def api_scrape_source(source_id: str, max_items: int = Query(10, ge=1, le=50)) -
 
 @app.post("/api/projects/{project_id}/pipeline")
 def api_run_pipeline(project_id: str) -> dict:
-    results: dict = {}
-    scrape_results = scrape_project(project_id, max_items=10)
-    results["scrape"] = [r.__dict__ for r in scrape_results]
-    results["ingest"] = ingest_source_items(limit=50, fetch_full=True, project_id=project_id)
-    extract_total = 0
-    judge_total = 0
-    max_extract = 200
-    max_judge = 500
-    while extract_total < max_extract:
-        count = run_extraction(limit=20, project_id=project_id)
-        extract_total += count
-        if count == 0:
-            break
-    while judge_total < max_judge:
-        count = run_first_judge(limit=50, project_id=project_id)
-        judge_total += count
-        if count == 0:
-            break
-    results["extract"] = extract_total
-    results["judge"] = judge_total
-    results["dedupe"] = dedupe_articles(project_id)
-    results["unusable"] = mark_low_score_unusable(project_id)
+    results = run_project_pipeline(project_id, max_items=10)
     return {"status": "ok", "results": results}
 
 

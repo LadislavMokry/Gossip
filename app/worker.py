@@ -13,6 +13,8 @@ from .pipeline import (
     fetch_latest_audio_roundup,
     fetch_latest_selected_video,
     cleanup_old_data,
+    run_pipeline_all,
+    run_project_pipeline,
     run_audio_roundup,
     run_extraction,
     run_first_judge,
@@ -66,6 +68,9 @@ def main() -> None:
     sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
     sub.add_parser("render-audio-roundup-video", help="Render latest audio roundup to MP4")
     sub.add_parser("render-video", help="Render latest selected video to MP4")
+    pipeline_parser = sub.add_parser("pipeline", help="Run full pipeline per project")
+    pipeline_parser.add_argument("--project-id", type=str, default=None, help="Project ID filter")
+    pipeline_parser.add_argument("--max-items", type=int, default=10, help="Max items per source")
     cleanup_parser = sub.add_parser("cleanup", help="Delete old source items and wipe unusable content")
     cleanup_parser.add_argument("--hours", type=int, default=48, help="Age threshold in hours")
     cleanup_parser.add_argument(
@@ -175,6 +180,14 @@ def main() -> None:
         render_short_video(content, out_path)
         update_post_media(row["id"], str(out_path))
         print(f"video_rendered=1 path={out_path}")
+        return
+    if args.command == "pipeline":
+        if args.project_id:
+            results = run_project_pipeline(args.project_id, max_items=args.max_items)
+            print(f"pipeline_project={args.project_id} results={results}")
+        else:
+            results = run_pipeline_all(max_items=args.max_items)
+            print(f"pipeline_all count={len(results)}")
         return
     if args.command == "cleanup":
         results = cleanup_old_data(

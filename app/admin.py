@@ -40,6 +40,26 @@ def _to_iso(value: Any) -> str | None:
         return None
 
 
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
+def _should_scrape_source(source: dict) -> bool:
+    interval = int(source.get("scrape_interval_hours") or 6)
+    last = _parse_iso(source.get("last_scraped_at"))
+    if not last:
+        return True
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    age_seconds = (datetime.now(timezone.utc) - last).total_seconds()
+    return age_seconds >= interval * 3600
+
+
 def _truncate(value: str, max_chars: int = MAX_CONTENT_CHARS) -> str:
     if not value:
         return ""
@@ -519,7 +539,16 @@ class ScrapeResult:
 def scrape_project(project_id: str, max_items: int = 10) -> list[ScrapeResult]:
     sources = [s for s in list_sources(project_id) if s.get("enabled", True)]
     results: list[ScrapeResult] = []
+    sb = get_supabase()
     for source in sources:
+        if not _should_scrape_source(source):
+            source_id = source.get("id")
+            if source_id:
+                sb.table("sources").update(
+                    {"last_status": "skipped", "updated_at": _now_iso()}
+                ).eq("id", source_id).execute()
+            results.append(ScrapeResult(source_id=source_id or "", count=0, status="skipped"))
+            continue
         results.append(scrape_source(source, max_items=max_items))
     return results
 

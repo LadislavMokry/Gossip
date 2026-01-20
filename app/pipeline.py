@@ -7,6 +7,7 @@ from app.ai.extract import extract_summary
 from app.ai.first_judge import default_format_rules, judge_summary
 from app.ai.generate import generate_video_variant, generation_models
 from app.ai.second_judge import pick_winner
+from app.admin import ingest_source_items, list_projects, scrape_project
 from app.config import get_settings
 from app.db import get_supabase
 
@@ -559,3 +560,77 @@ def cleanup_old_data(
 
     summary["articles_wiped"] = len(to_wipe)
     return summary
+
+
+def log_pipeline_run(
+    project_id: str | None,
+    results: dict,
+    status: str = "ok",
+    started_at: str | None = None,
+    finished_at: str | None = None,
+) -> None:
+    sb = get_supabase()
+    payload = {
+        "project_id": project_id,
+        "run_type": "pipeline",
+        "status": status,
+        "scrape_count": len(results.get("scrape") or []),
+        "ingest_count": int(results.get("ingest") or 0),
+        "extract_count": int(results.get("extract") or 0),
+        "judge_count": int(results.get("judge") or 0),
+        "dedupe_count": int(results.get("dedupe") or 0),
+        "unusable_count": int(results.get("unusable") or 0),
+        "started_at": started_at or _now(),
+        "finished_at": finished_at or _now(),
+    }
+    try:
+        sb.table("pipeline_runs").insert(payload).execute()
+    except Exception:
+        # Logging is best-effort; do not break pipeline on insert failure.
+        return
+
+
+def run_project_pipeline(project_id: str, max_items: int = 10) -> dict:
+    started_at = _now()
+    results: dict = {}
+    scrape_results = scrape_project(project_id, max_items=max_items)
+    results["scrape"] = [r.__dict__ for r in scrape_results]
+    results["ingest"] = ingest_source_items(limit=50, fetch_full=True, project_id=project_id)
+    extract_total = 0
+    judge_total = 0
+    max_extract = 200
+    max_judge = 500
+    while extract_total < max_extract:
+        count = run_extraction(limit=20, project_id=project_id)
+        extract_total += count
+        if count == 0:
+            break
+    while judge_total < max_judge:
+        count = run_first_judge(limit=50, project_id=project_id)
+        judge_total += count
+        if count == 0:
+            break
+    results["extract"] = extract_total
+    results["judge"] = judge_total
+    results["dedupe"] = dedupe_articles(project_id)
+    results["unusable"] = mark_low_score_unusable(project_id)
+    finished_at = _now()
+    log_pipeline_run(project_id, results, started_at=started_at, finished_at=finished_at)
+    return results
+
+
+def run_pipeline_all(max_items: int = 10) -> list[dict]:
+    results: list[dict] = []
+    projects = list_projects()
+    for project in projects:
+        project_id = project.get("id")
+        if not project_id:
+            continue
+        results.append(
+            {
+                "project_id": project_id,
+                "name": project.get("name"),
+                "results": run_project_pipeline(project_id, max_items=max_items),
+            }
+        )
+    return results

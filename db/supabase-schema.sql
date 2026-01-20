@@ -323,6 +323,28 @@ CREATE INDEX IF NOT EXISTS idx_article_usage_usage_type ON article_usage(usage_t
 
 COMMENT ON TABLE article_usage IS 'Tracks usage of articles in downstream content';
 
+-- TABLE 7B: pipeline_runs
+-- Tracks per-project pipeline executions for cadence tuning
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  run_type TEXT DEFAULT 'pipeline',
+  status TEXT DEFAULT 'ok',
+  scrape_count INTEGER DEFAULT 0,
+  ingest_count INTEGER DEFAULT 0,
+  extract_count INTEGER DEFAULT 0,
+  judge_count INTEGER DEFAULT 0,
+  dedupe_count INTEGER DEFAULT 0,
+  unusable_count INTEGER DEFAULT 0,
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  finished_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_project_id ON pipeline_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at DESC);
+
+COMMENT ON TABLE pipeline_runs IS 'Per-project pipeline run metrics (scrape/ingest/extract/judge)';
+
 -- TABLE 8: youtube_accounts
 -- Stores OAuth refresh tokens per project (server-side use only)
 CREATE TABLE IF NOT EXISTS youtube_accounts (
