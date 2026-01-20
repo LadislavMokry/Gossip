@@ -28,6 +28,7 @@ Last updated: 2026-01-20
 - Server `.env.local` set with SUPABASE_URL / SUPABASE_KEY / OPENAI_API_KEY.
 - Requirements updated with `lxml_html_clean` to fix trafilatura import.
 - `media_out/` is now ignored by Git.
+- Server access: added new desktop SSH key and verified login from desktop.
 
 ## Launch prep (remainder / what’s left before going live)
 1. Verify end-to-end pipeline per project (scrape → ingest → extract → score → audio roundup → render audio/video).
@@ -63,10 +64,9 @@ Last updated: 2026-01-20
 - Added `articles.source_id` to track source-level stats.
 
 ## Current blockers / open issues
-- Need to run DB migrations for new columns/tables (see `db/supabase-schema.sql`).
-  - At minimum: add `articles.source_id`.
+- [Fixed 2026-01-20] DB migrations applied for new columns/tables (see `db/supabase-schema.sql`), including `articles.source_id`.
 - Stats only count articles ingested after `source_id` exists (older articles need backfill if desired).
- - OpenAI Images access still returns 403 (video uses placeholders).
+- [Fixed 2026-01-20] OpenAI Images access resolved; images now generate successfully.
 
 ## Next steps (recommended)
 1. Monitor the current pipeline run (running on server; expected to complete after scoring backlog clears).
@@ -141,9 +141,7 @@ Last updated: 2026-01-20
 - `docs/testing-checklist.md` updated to reflect passing render steps and the image 403 note.
 
 ## Current blockers / open issues
-- OpenAI images API returns **403 Forbidden** for `/v1/images/generations`.
-  - Result: video renders with placeholder images (black background + text).
-  - Likely due to missing Images access/billing on the API key.
+- [Fixed 2026-01-20] OpenAI Images access resolved; `/v1/images/generations` now works and renders real images.
 
 ## What works now (verified)
 - `python -m app.worker render-audio-roundup` → MP3 created in `media_out/`.
