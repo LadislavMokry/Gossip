@@ -35,3 +35,37 @@ Open:
 ```
 http://127.0.0.1:8000
 ```
+
+## Server access (Hetzner)
+
+SSH from your local machine:
+
+```
+ssh -i "$env:USERPROFILE\\.ssh\\id_ed25519_hetzner" root@46.224.232.56
+```
+
+Move into the repo + activate venv:
+
+```
+cd /root/OnePlace
+source .venv/bin/activate
+```
+
+Check service status:
+
+```
+systemctl status oneplace-api.service --no-pager
+systemctl list-timers --all | grep oneplace
+```
+
+Logs:
+
+```
+tail -n 50 /var/log/oneplace/pipeline.log
+```
+
+Admin UI (basic auth):
+
+```
+http://46.224.232.56/
+```

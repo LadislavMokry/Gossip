@@ -8,6 +8,26 @@ Last updated: 2026-01-20
   - Deleted `articles` where `project_id IS NULL` (left project-scoped articles intact).
 - Added cleanup worker step to delete old `source_items` and wipe unusable article content after a retention window (see `app/pipeline.py` + `app/worker.py`).
 - Provisioned Hetzner Cloud server (see `docs/server-notes.md`) and installed base dependencies (git, python3-venv, python3-pip, ffmpeg).
+- Removed legacy n8n folders/files (`workflows/`, `n8n-skills/`, `CLAUDE.md`, `assets/manual-intake.html`, `docs/scraper-workflow-quick-start.md`).
+- Rewrote `docs/implementation-plan.md` + `docs/todo.md` to reflect the Python-first/server approach.
+- Added pipeline run logging:
+  - New `pipeline_runs` table added to `db/supabase-schema.sql`
+  - Patch file created: `db/patches/2026-01-20-pipeline-runs.sql`
+  - Pipeline logging implemented in `app/pipeline.py`
+  - New worker command: `python -m app.worker pipeline`
+- Added per-source scrape interval checks (`scrape_interval_hours`) to skip frequent scrapes.
+- Set up server services + timers:
+  - `oneplace-api.service` (Uvicorn on 0.0.0.0:8000)
+  - `oneplace-cleanup.timer` (every 48 hours)
+  - `oneplace-pipeline.timer` (every 3 hours)
+  - `oneplace-generate.timer` (daily 06:10 UTC)
+  - `oneplace-second-judge.timer` (daily 06:25 UTC)
+  - `oneplace-audio-roundup.timer` (daily 06:40 UTC)
+  - `oneplace-render-roundup.timer` (daily 06:50 UTC)
+- Installed Nginx + basic auth (Laco / 290198150896) and proxy on port 80.
+- Server `.env.local` set with SUPABASE_URL / SUPABASE_KEY / OPENAI_API_KEY.
+- Requirements updated with `lxml_html_clean` to fix trafilatura import.
+- `media_out/` is now ignored by Git.
 
 ## Launch prep (remainder / what’s left before going live)
 1. Verify end-to-end pipeline per project (scrape → ingest → extract → score → audio roundup → render audio/video).
@@ -46,15 +66,17 @@ Last updated: 2026-01-20
 - Need to run DB migrations for new columns/tables (see `db/supabase-schema.sql`).
   - At minimum: add `articles.source_id`.
 - Stats only count articles ingested after `source_id` exists (older articles need backfill if desired).
+ - OpenAI Images access still returns 403 (video uses placeholders).
 
 ## Next steps (recommended)
-1. Re-run pipeline and verify articles get scored + appear in Articles & Scores.
-2. Test audio roundup generation (Generate Script → Render Audio) after scoring completes.
-3. Validate `/stats` page and decide whether to backfill older articles with `source_id`.
-4. Implement auto-scheduling for pipeline + audio roundup (set-and-forget).
-5. Test generating + plan automation for uploading and post-performance stats ingestion.
-6. Brainstorm social strategy + monetization plan; plan how to automate social account setup (or decide manual process).
-7. Add API cost tracking to `/stats` (start with OpenAI usage/costs; keep extensible for future providers).
+1. Monitor the current pipeline run (running on server; expected to complete after scoring backlog clears).
+2. Confirm pipeline logs are being written to `/var/log/oneplace/*.log`.
+3. Verify Nginx basic auth access at `http://46.224.232.56/`.
+4. Validate that `pipeline_runs` rows are inserting in Supabase.
+5. Decide whether to add log rotation for `/var/log/oneplace/*.log`.
+6. Fix OpenAI image generation access (403) or add alternate image provider.
+7. Optional: add generation interval checks (`projects.generation_interval_hours`, `last_generated_at`) to skip daily runs if already done.
+8. At next session start: check systemd timers ran and review `/var/log/oneplace/*.log` for failures.
 
 ## Summary of this session (2026-01-17, later)
 - Admin UI JS refactor: cached DOM refs, event delegation for source actions, shared helpers, and safer HTML rendering.
