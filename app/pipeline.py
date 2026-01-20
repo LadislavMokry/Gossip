@@ -482,3 +482,80 @@ def fetch_latest_selected_video() -> dict | None:
 def update_post_media(post_id: str, media_url: str) -> None:
     sb = get_supabase()
     sb.table("posts").update({"media_urls": [media_url]}).eq("id", post_id).execute()
+
+
+def _chunk_ids(values: list[str], size: int = 200) -> list[list[str]]:
+    return [values[i : i + size] for i in range(0, len(values), size)]
+
+
+def cleanup_old_data(
+    hours: int = 48,
+    delete_legacy: bool = True,
+    wipe_unusable: bool = True,
+) -> dict:
+    sb = get_supabase()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_iso = cutoff.isoformat()
+    summary: dict[str, int] = {}
+
+    if delete_legacy:
+        resp = sb.table("category_pages").delete().lt("scraped_at", cutoff_iso).execute()
+        summary["category_pages_deleted"] = len(resp.data or [])
+        resp = sb.table("article_urls").delete().lt("discovered_at", cutoff_iso).execute()
+        summary["article_urls_deleted"] = len(resp.data or [])
+
+    resp = sb.table("source_items").delete().lt("scraped_at", cutoff_iso).execute()
+    summary["source_items_deleted"] = len(resp.data or [])
+
+    if not wipe_unusable:
+        return summary
+
+    ids: list[str] = []
+    page_size = 500
+    offset = 0
+    while True:
+        resp = (
+            sb.table("articles")
+            .select("id")
+            .eq("unusable", True)
+            .lt("scraped_at", cutoff_iso)
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        batch = resp.data or []
+        if not batch:
+            break
+        ids.extend([row["id"] for row in batch if row.get("id")])
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    if not ids:
+        summary["articles_wiped"] = 0
+        return summary
+
+    posts = (
+        sb.table("posts")
+        .select("article_id")
+        .in_("article_id", ids)
+        .execute()
+        .data
+        or []
+    )
+    usage = (
+        sb.table("article_usage")
+        .select("article_id")
+        .in_("article_id", ids)
+        .execute()
+        .data
+        or []
+    )
+    blocked = {row["article_id"] for row in posts if row.get("article_id")}
+    blocked.update({row["article_id"] for row in usage if row.get("article_id")})
+
+    to_wipe = [article_id for article_id in ids if article_id not in blocked]
+    for chunk in _chunk_ids(to_wipe, size=200):
+        sb.table("articles").update({"raw_html": None, "content": None}).in_("id", chunk).execute()
+
+    summary["articles_wiped"] = len(to_wipe)
+    return summary

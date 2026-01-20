@@ -12,6 +12,7 @@ from .media.paths import roundup_audio_path, roundup_video_path, short_video_pat
 from .pipeline import (
     fetch_latest_audio_roundup,
     fetch_latest_selected_video,
+    cleanup_old_data,
     run_audio_roundup,
     run_extraction,
     run_first_judge,
@@ -65,6 +66,18 @@ def main() -> None:
     sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
     sub.add_parser("render-audio-roundup-video", help="Render latest audio roundup to MP4")
     sub.add_parser("render-video", help="Render latest selected video to MP4")
+    cleanup_parser = sub.add_parser("cleanup", help="Delete old source items and wipe unusable content")
+    cleanup_parser.add_argument("--hours", type=int, default=48, help="Age threshold in hours")
+    cleanup_parser.add_argument(
+        "--no-legacy",
+        action="store_true",
+        help="Skip deleting legacy category_pages and article_urls",
+    )
+    cleanup_parser.add_argument(
+        "--no-wipe",
+        action="store_true",
+        help="Skip wiping unusable article content",
+    )
 
     loop_parser = sub.add_parser("scrape-loop", help="Scrape on an interval")
     loop_parser.add_argument("--interval", type=int, default=3600, help="Seconds between runs")
@@ -162,6 +175,14 @@ def main() -> None:
         render_short_video(content, out_path)
         update_post_media(row["id"], str(out_path))
         print(f"video_rendered=1 path={out_path}")
+        return
+    if args.command == "cleanup":
+        results = cleanup_old_data(
+            hours=args.hours,
+            delete_legacy=not args.no_legacy,
+            wipe_unusable=not args.no_wipe,
+        )
+        print("cleanup=" + ",".join([f"{k}={v}" for k, v in results.items()]))
         return
 
     if args.command == "scrape-loop":
