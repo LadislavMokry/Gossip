@@ -1,5 +1,13 @@
 # Handoff Notes
-Last updated: 2026-01-19
+Last updated: 2026-01-20
+
+## Summary of this session (2026-01-20)
+- Verified Supabase schema is up to date using existing .env.local keys.
+- Cleaned legacy data:
+  - Deleted all rows from `category_pages` and `article_urls`.
+  - Deleted `articles` where `project_id IS NULL` (left project-scoped articles intact).
+- Added cleanup worker step to delete old `source_items` and wipe unusable article content after a retention window (see `app/pipeline.py` + `app/worker.py`).
+- Provisioned Hetzner Cloud server (see `docs/server-notes.md`) and installed base dependencies (git, python3-venv, python3-pip, ffmpeg).
 
 ## Launch prep (remainder / what’s left before going live)
 1. Verify end-to-end pipeline per project (scrape → ingest → extract → score → audio roundup → render audio/video).
