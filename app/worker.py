@@ -11,6 +11,7 @@ from .media.short_video import render_short_video
 from .media.paths import roundup_audio_path, roundup_video_path, short_video_path
 from .pipeline import (
     fetch_latest_audio_roundup,
+    fetch_latest_audio_roundup_for_project,
     fetch_latest_selected_video,
     cleanup_old_data,
     run_pipeline_all,
@@ -73,7 +74,18 @@ def main() -> None:
     audio_roundup = sub.add_parser("audio-roundup", help="Run audio roundup once")
     audio_roundup.add_argument("--project-id", type=str, default=None, help="Project ID for language settings")
     audio_roundup.add_argument("--language", type=str, default=None, help="Override language (en, es, sk)")
-    sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
+    audio_roundup.add_argument(
+        "--all-projects",
+        action="store_true",
+        help="Run audio roundup for every project",
+    )
+    render_roundup = sub.add_parser("render-audio-roundup", help="Render latest audio roundup to MP3")
+    render_roundup.add_argument("--project-id", type=str, default=None, help="Project ID filter")
+    render_roundup.add_argument(
+        "--all-projects",
+        action="store_true",
+        help="Render latest audio roundup for every project",
+    )
     sub.add_parser("render-audio-roundup-video", help="Render latest audio roundup to MP4")
     sub.add_parser("render-video", help="Render latest selected video to MP4")
     pipeline_parser = sub.add_parser("pipeline", help="Run full pipeline per project")
@@ -140,12 +152,43 @@ def main() -> None:
         print(f"second_judged={count}")
         return
     if args.command == "audio-roundup":
+        if args.all_projects:
+            total = 0
+            projects = list_projects()
+            for project in projects:
+                project_id = project.get("id")
+                if not project_id:
+                    continue
+                total += run_audio_roundup(project_id=project_id)
+            print(f"audio_roundup_all={total}")
+            return
         count = run_audio_roundup(project_id=args.project_id, language=args.language)
         print(f"audio_roundup={count}")
         return
     if args.command == "render-audio-roundup":
         settings = get_settings()
-        row = fetch_latest_audio_roundup()
+        if args.all_projects:
+            rendered = 0
+            projects = list_projects()
+            for project in projects:
+                project_id = project.get("id")
+                if not project_id:
+                    continue
+                row = fetch_latest_audio_roundup_for_project(project_id)
+                if not row:
+                    continue
+                content = row.get("content") or {}
+                dialogue = content.get("dialogue") or []
+                out_dir = Path(settings.media_output_dir)
+                out_path = roundup_audio_path(out_dir, row["id"])
+                render_audio_roundup(dialogue, out_path)
+                rendered += 1
+            print(f"audio_roundup_rendered_all={rendered}")
+            return
+        if args.project_id:
+            row = fetch_latest_audio_roundup_for_project(args.project_id)
+        else:
+            row = fetch_latest_audio_roundup()
         if not row:
             print("audio_roundup_rendered=0")
             return

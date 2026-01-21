@@ -149,6 +149,11 @@ Phase 7: Publishing (Planned)
 - [ ] Build rate-limited posting worker
 - [ ] Store post_url, posted_at
 - [ ] Handle API errors and retries
+- [ ] YouTube: create channel(s) per project + enable API access
+- [ ] YouTube OAuth flow: store refresh_token + channel metadata in youtube_accounts
+- [ ] YouTube upload worker for daily audio roundup per project
+- [ ] YouTube metadata: title/description/tags/playlist + thumbnail handling
+- [ ] YouTube metrics ingestion (daily) into performance_metrics or a dedicated youtube_metrics table
 
 Phase 7B: Video/Audio (Planned)
 - [ ] Define 1-2 minute, 9:16 video pipeline (images + TTS + captions)
@@ -167,6 +172,8 @@ Phase 8: Monitoring + Ops
 - [ ] Cost tracking (tokens, API usage)
 - [ ] Data retention policy
 - [ ] Backups (Supabase)
+- [ ] A/B testing plan for LLM providers (script model + TTS model/voice)
+- [ ] Add table for audio generation metadata (post_id, script_model, tts_model, voice, provider, run_at)
 
 Quick Test Checklist
 - [ ] /health ok

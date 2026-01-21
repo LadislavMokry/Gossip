@@ -472,6 +472,63 @@ def fetch_latest_audio_roundup() -> dict | None:
     return data[0] if data else None
 
 
+def fetch_latest_audio_roundup_for_project(project_id: str) -> dict | None:
+    sb = get_supabase()
+    resp = (
+        sb.table("posts")
+        .select("id, content, created_at")
+        .eq("content_type", "audio_roundup")
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    candidates = resp.data or []
+    if not candidates:
+        return None
+    post_ids = [row.get("id") for row in candidates if row.get("id")]
+    if not post_ids:
+        return None
+    usage = (
+        sb.table("article_usage")
+        .select("post_id, article_id")
+        .in_("post_id", post_ids)
+        .execute()
+        .data
+        or []
+    )
+    if not usage:
+        return None
+    article_ids = [row.get("article_id") for row in usage if row.get("article_id")]
+    if not article_ids:
+        return None
+    articles = (
+        sb.table("articles")
+        .select("id, project_id")
+        .in_("id", article_ids)
+        .execute()
+        .data
+        or []
+    )
+    project_lookup = {row["id"]: row.get("project_id") for row in articles if row.get("id")}
+    post_projects: dict[str, set[str]] = {}
+    for row in usage:
+        post_id = row.get("post_id")
+        article_id = row.get("article_id")
+        if not post_id or not article_id:
+            continue
+        project = project_lookup.get(article_id)
+        if not project:
+            continue
+        post_projects.setdefault(post_id, set()).add(project)
+
+    for row in candidates:
+        post_id = row.get("id")
+        projects = post_projects.get(post_id) or set()
+        if project_id in projects:
+            return row
+    return None
+
+
 def fetch_latest_selected_video() -> dict | None:
     sb = get_supabase()
     resp = (
