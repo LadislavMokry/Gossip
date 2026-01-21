@@ -4,6 +4,7 @@ Last updated: 2026-01-20
 ## Scope
 - Python-first system (FastAPI + worker scripts).
 - Video-first outputs (shorts + audio roundup). Multi-format outputs are deferred.
+- Each project should support a funnel: short-form content drives users to a longer-form daily podcast (7-10 minutes) with a paid subscription target.
 - Project-based sources (RSS, Reddit, page, YouTube) managed in the Admin UI.
 - Storage: Supabase (projects, sources, source_items, articles, posts, article_usage, youtube_accounts).
 
@@ -36,6 +37,7 @@ Last updated: 2026-01-20
 7. **Second judge** -> choose best variant (`selected = true`)
 8. **Audio roundup** -> `posts` + `article_usage`
 9. **Render media** -> MP3/MP4 assets in `media_out/`
+10. **Audience funnel** -> short-form hooks link to the daily 7-10 minute podcast (subscription-oriented).
 
 ---
 
@@ -97,4 +99,3 @@ Last updated: 2026-01-20
 - [ ] Pipeline completes for at least one project.
 - [ ] Audio roundup script renders to MP3 and MP4.
 - [ ] Short video renders with captions.
-

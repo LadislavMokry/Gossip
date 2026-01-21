@@ -17,6 +17,7 @@ Legend:
 - [✓] Short video rendering (FFmpeg).
 - [✓] Cleanup worker added (retention policy).
 - [→] Server deployment (Hetzner) in progress.
+- [ ] Define per-project funnel strategy (short-form -> daily 7-10 min paid podcast).
 
 ---
 
@@ -63,4 +64,4 @@ Legend:
 - [ ] Add posting worker + rate limiting
 - [ ] Add metrics ingestion (YouTube first)
 - [ ] Add cost tracking in stats view
-
+- [ ] Add subscription CTA tracking (short-form -> podcast conversion)

@@ -7,6 +7,11 @@ This repo uses a Python-first architecture (FastAPI + worker scripts) for manual
 - Database schema: `db/supabase-schema.sql` (tables for articles, posts, metrics).
 - Guides and specs: `docs/SETUP-GUIDE.md`, `docs/slovak-gossip-automation-spec (1).md`, `docs/implementation-plan.md`, `docs/todo.md`, `docs/manual-intake.md`.
 
+## Product Goal (Important Context)
+- Each project should support a funnel: short-form (TikTok-style) content leads users to a longer-form daily podcast (7-10 minutes).
+- The longer-form podcast is intended to be paid (subscription).
+- Source selection, scoring, and generation should prioritize hooks that convert short-form viewers into podcast listeners.
+
 ## Build, Test, and Development Commands
 There is no build step or test runner in this repo.
 
