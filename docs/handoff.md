@@ -1,5 +1,16 @@
 # Handoff Notes
-Last updated: 2026-01-20
+Last updated: 2026-01-21
+
+## Summary of this session (2026-01-21)
+- YouTube uploads enabled end-to-end for audio roundups (OAuth stored in `youtube_accounts`).
+- Added YouTube upload worker + systemd timer (`oneplace-youtube-upload.timer` at 07:00 UTC).
+- Added YouTube Analytics daily metrics + `/stats` UI section.
+- Added per-video YouTube checkpoint metrics (1h, 12h, 24h, 3d, 7d, 14d, 30d) + `/stats` UI section with LLM/TTS metadata.
+- Added `youtube_metrics` + `youtube_video_metrics` tables and DB patches.
+- Added YouTube analytics worker commands:
+  - `python -m app.worker youtube-analytics`
+  - `python -m app.worker youtube-video-metrics`
+- Fixed YouTube upload metadata sanitization (avoid empty titles).
 
 ## Summary of this session (2026-01-20)
 - Verified Supabase schema is up to date using existing .env.local keys.
@@ -69,14 +80,11 @@ Last updated: 2026-01-20
 - [Fixed 2026-01-20] OpenAI Images access resolved; images now generate successfully.
 
 ## Next steps (recommended)
-1. Monitor the current pipeline run (running on server; expected to complete after scoring backlog clears).
-2. Confirm pipeline logs are being written to `/var/log/oneplace/*.log`.
-3. Verify Nginx basic auth access at `http://46.224.232.56/`.
-4. Validate that `pipeline_runs` rows are inserting in Supabase.
-5. Decide whether to add log rotation for `/var/log/oneplace/*.log`.
-6. Fix OpenAI image generation access (403) or add alternate image provider.
-7. Optional: add generation interval checks (`projects.generation_interval_hours`, `last_generated_at`) to skip daily runs if already done.
-8. At next session start: check systemd timers ran and review `/var/log/oneplace/*.log` for failures.
+1. Create the other 4 YouTube brand channels once the account is verified; run OAuth per channel and save refresh tokens in `youtube_accounts`.
+2. Add other LLM script providers for A/B tests: Anthropic, xAI, Google.
+3. Add Inworld AI TTS with A/B test voices: Ashley, Deborah, Dennis, Edward, Sarah, Timothy.
+4. Consider adding a daily timer for `youtube-analytics` + `youtube-video-metrics`.
+5. At next session start: check systemd timers ran and review `/var/log/oneplace/*.log` for failures.
 
 ## Summary of this session (2026-01-17, later)
 - Admin UI JS refactor: cached DOM refs, event delegation for source actions, shared helpers, and safer HTML rendering.
