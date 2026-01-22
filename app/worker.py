@@ -208,9 +208,11 @@ def main() -> None:
                     continue
                 content = row.get("content") or {}
                 dialogue = content.get("dialogue") or []
+                voice_a = content.get("tts_voice_a")
+                voice_b = content.get("tts_voice_b")
                 out_dir = Path(settings.media_output_dir)
                 out_path = roundup_audio_path(out_dir, row["id"])
-                render_audio_roundup(dialogue, out_path)
+                render_audio_roundup(dialogue, out_path, voice_a=voice_a, voice_b=voice_b)
                 rendered += 1
             print(f"audio_roundup_rendered_all={rendered}")
             return
@@ -223,9 +225,11 @@ def main() -> None:
             return
         content = row.get("content") or {}
         dialogue = content.get("dialogue") or []
+        voice_a = content.get("tts_voice_a")
+        voice_b = content.get("tts_voice_b")
         out_dir = Path(settings.media_output_dir)
         out_path = roundup_audio_path(out_dir, row["id"])
-        render_audio_roundup(dialogue, out_path)
+        render_audio_roundup(dialogue, out_path, voice_a=voice_a, voice_b=voice_b)
         print(f"audio_roundup_rendered=1 path={out_path}")
         return
     if args.command == "render-audio-roundup-video":

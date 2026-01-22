@@ -187,7 +187,9 @@ def _record_audio_run(
 ) -> None:
     settings = get_settings()
     audio_url = f"/api/audio-roundup/{post_id}/audio"
-    voices = f"host_a:{settings.audio_roundup_voice_a},host_b:{settings.audio_roundup_voice_b}"
+    voice_a = content.get("tts_voice_a") or settings.audio_roundup_voice_a
+    voice_b = content.get("tts_voice_b") or settings.audio_roundup_voice_b
+    voices = f"host_a:{voice_a},host_b:{voice_b}"
     tts_provider = (settings.tts_provider or "openai").lower()
     tts_model = settings.inworld_tts_model if tts_provider == "inworld" else settings.tts_model
     payload = {

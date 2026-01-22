@@ -418,6 +418,19 @@ COMMENT ON TABLE youtube_video_metrics IS 'Per-video checkpoint metrics (views/l
 COMMENT ON COLUMN youtube_video_metrics.checkpoint IS 'Checkpoint label (1h, 12h, 24h, 3d, 7d, 14d, 30d)';
 
 -- ============================================================
+-- TABLE 11: tts_rotation
+-- Atomic counter for rotating TTS voice pairs
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS tts_rotation (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  counter INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+COMMENT ON TABLE tts_rotation IS 'Global counter for rotating TTS voice combinations';
+
+-- ============================================================
 -- MIGRATION HELPERS (safe to re-run)
 -- ============================================================
 
@@ -438,6 +451,11 @@ ALTER TABLE IF EXISTS projects
 
 ALTER TABLE IF EXISTS projects
   ADD COLUMN IF NOT EXISTS audio_roundup_prompt_extra TEXT;
+
+-- Ensure rotation row exists for TTS combos
+INSERT INTO tts_rotation (id, counter)
+VALUES (1, 0)
+ON CONFLICT (id) DO NOTHING;
 
 ALTER TABLE IF EXISTS articles
   ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
@@ -597,6 +615,31 @@ END;
 $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION update_model_performance IS 'Increments judge_wins and total_posts for a model after Second Judge selection';
+
+-- Function: Next TTS combo index (atomic)
+CREATE OR REPLACE FUNCTION next_tts_combo(p_mod INTEGER DEFAULT 9)
+RETURNS INTEGER AS $$
+DECLARE current_val INTEGER;
+BEGIN
+  INSERT INTO tts_rotation (id, counter)
+  VALUES (1, 0)
+  ON CONFLICT (id) DO NOTHING;
+
+  SELECT counter INTO current_val
+  FROM tts_rotation
+  WHERE id = 1
+  FOR UPDATE;
+
+  UPDATE tts_rotation
+  SET counter = counter + 1,
+      updated_at = NOW()
+  WHERE id = 1;
+
+  RETURN MOD(current_val, p_mod);
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION next_tts_combo IS 'Atomically increments TTS rotation counter and returns index modulo p_mod';
 
 -- ============================================================
 -- SAMPLE DATA (Optional - for testing)

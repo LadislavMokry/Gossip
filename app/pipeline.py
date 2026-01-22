@@ -446,6 +446,54 @@ def _project_prompts(project_id: str) -> dict:
     return data[0] if data else {}
 
 
+def _tts_voice_pairs() -> list[tuple[str, str]]:
+    # host_a = male, host_b = female
+    male = ["Timothy", "Dennis", "Edward"]
+    female = ["Ashley", "Deborah", "Sarah"]
+    return [(m, f) for m in male for f in female]
+
+
+def _next_tts_combo() -> tuple[int, str, str] | None:
+    pairs = _tts_voice_pairs()
+    if not pairs:
+        return None
+    sb = get_supabase()
+    try:
+        resp = sb.rpc("next_tts_combo", {"p_mod": len(pairs)}).execute()
+    except Exception:
+        resp = None
+    idx = None
+    if resp is not None:
+        data = resp.data
+        if isinstance(data, list) and data:
+            val = data[0]
+            if isinstance(val, dict):
+                idx = val.get("next_tts_combo") or val.get("result")
+            else:
+                idx = val
+        elif isinstance(data, dict):
+            idx = data.get("next_tts_combo") or data.get("result")
+        elif isinstance(data, (int, float)):
+            idx = data
+    if idx is None:
+        try:
+            count = (
+                sb.table("posts")
+                .select("id", count="exact")
+                .eq("content_type", "audio_roundup")
+                .execute()
+                .count
+                or 0
+            )
+        except Exception:
+            return None
+        idx = count % len(pairs)
+    else:
+        idx = int(idx) % len(pairs)
+    male, female = pairs[idx]
+    return (idx, male, female)
+
+
 def run_audio_roundup(project_id: str | None = None, language: str | None = None) -> int:
     settings = get_settings()
     prompt_extra = None
@@ -470,6 +518,16 @@ def run_audio_roundup(project_id: str | None = None, language: str | None = None
             }
         )
     content = generate_audio_roundup(stories, language=language, extra_prompt=prompt_extra)
+    if isinstance(content, dict):
+        combo = _next_tts_combo()
+        if combo:
+            idx, voice_a, voice_b = combo
+            content["tts_voice_a"] = voice_a
+            content["tts_voice_b"] = voice_b
+            content["tts_combo_index"] = idx
+        provider = (settings.tts_provider or "openai").lower()
+        content["tts_provider"] = provider
+        content["tts_model"] = settings.inworld_tts_model if provider == "inworld" else settings.tts_model
     post = insert_audio_roundup(settings.audio_roundup_model, content)
     if post:
         usage_rows = [

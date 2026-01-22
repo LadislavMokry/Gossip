@@ -164,6 +164,26 @@
           <tbody id="youtubeVideoBody"></tbody>
         </table>
       </section>
+
+      <section class="panel">
+        <h2>Voice Pair Performance (24h)</h2>
+        <div class="small muted" id="voiceMeta">No voice stats yet.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Voice Pair</th>
+              <th>Videos</th>
+              <th>Avg Views</th>
+              <th>Avg Likes</th>
+              <th>Avg Comments</th>
+              <th>Avg Watch (min)</th>
+              <th>Avg View (sec)</th>
+              <th>TTS Model</th>
+            </tr>
+          </thead>
+          <tbody id="voiceBody"></tbody>
+        </table>
+      </section>
     </main>
     <script>
       const dom = {
@@ -175,7 +195,9 @@
         youtubeFooter: document.getElementById("youtubeFooter"),
         youtubeMeta: document.getElementById("youtubeMeta"),
         youtubeVideoBody: document.getElementById("youtubeVideoBody"),
-        youtubeVideoMeta: document.getElementById("youtubeVideoMeta")
+        youtubeVideoMeta: document.getElementById("youtubeVideoMeta"),
+        voiceBody: document.getElementById("voiceBody"),
+        voiceMeta: document.getElementById("voiceMeta")
       };
 
       async function api(path, options = {}) {
@@ -226,6 +248,7 @@
         const rows = data.sources || [];
         const ytRows = data.youtube_metrics || [];
         const ytVideoRows = data.youtube_video_metrics || [];
+        const voiceRows = data.voice_stats || [];
         const channelTitle = data.youtube_channel_title || "";
         dom.projectMeta.textContent = `Sources: ${rows.length}`;
         dom.statsBody.innerHTML = "";
@@ -324,6 +347,28 @@
             <td class="small">${row.tts_voice || "-"}</td>
           `;
           dom.youtubeVideoBody.appendChild(tr);
+        });
+
+        dom.voiceBody.innerHTML = "";
+        if (!voiceRows.length) {
+          dom.voiceMeta.textContent = "No voice stats yet.";
+          dom.voiceBody.innerHTML = "<tr><td colspan='8' class='small muted'>No data yet.</td></tr>";
+          return;
+        }
+        dom.voiceMeta.textContent = `Rows: ${voiceRows.length}`;
+        voiceRows.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="small">${row.voice_pair || "-"}</td>
+            <td class="small">${fmtInt(row.videos)}</td>
+            <td class="small">${fmtFloat(row.avg_views, 0)}</td>
+            <td class="small">${fmtFloat(row.avg_likes, 0)}</td>
+            <td class="small">${fmtFloat(row.avg_comments, 0)}</td>
+            <td class="small">${fmtFloat(row.avg_watch_time_minutes)}</td>
+            <td class="small">${fmtFloat(row.avg_view_duration_seconds, 0)}s</td>
+            <td class="small">${row.tts_model || "-"}</td>
+          `;
+          dom.voiceBody.appendChild(tr);
         });
       }
 

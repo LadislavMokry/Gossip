@@ -324,10 +324,12 @@ def api_render_audio_roundup(post_id: str) -> dict:
         raise HTTPException(status_code=404, detail="audio_roundup not found")
     content = data[0].get("content") or {}
     dialogue = content.get("dialogue") or []
+    voice_a = content.get("tts_voice_a")
+    voice_b = content.get("tts_voice_b")
     settings = get_settings()
     out_dir = Path(settings.media_output_dir)
     out_path = roundup_audio_path(out_dir, post_id)
-    render_audio_roundup(dialogue, out_path)
+    render_audio_roundup(dialogue, out_path, voice_a=voice_a, voice_b=voice_b)
     url = f"/api/audio-roundup/{post_id}/audio"
     update_post_media(post_id, url)
     return {"status": "ok", "url": url}

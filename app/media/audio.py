@@ -26,9 +26,16 @@ def _chunks(text: str, max_chars: int | None = None) -> Iterable[str]:
         start = end
 
 
-def render_audio_roundup(dialogue: list[dict], output_path: Path) -> Path:
+def render_audio_roundup(
+    dialogue: list[dict],
+    output_path: Path,
+    voice_a: str | None = None,
+    voice_b: str | None = None,
+) -> Path:
     settings = get_settings()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    voice_a = (voice_a or settings.audio_roundup_voice_a).strip()
+    voice_b = (voice_b or settings.audio_roundup_voice_b).strip()
 
     tmp_dir = output_path.parent / "tmp_audio"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -40,7 +47,7 @@ def render_audio_roundup(dialogue: list[dict], output_path: Path) -> Path:
         text = (turn.get("text") or "").strip()
         if not text:
             continue
-        voice = settings.audio_roundup_voice_a if speaker == "host_a" else settings.audio_roundup_voice_b
+        voice = voice_a if speaker == "host_a" else voice_b
         for chunk in _chunks(text):
             part_path = tmp_dir / f"part_{next(counter):03d}.mp3"
             generate_voiceover(chunk, part_path, voice=voice)

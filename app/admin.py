@@ -514,12 +514,14 @@ def project_stats(project_id: str) -> dict:
     stats.sort(key=lambda x: (x["hitrate"], x["total_articles"]), reverse=True)
     youtube_metrics = project_youtube_metrics(project_id)
     youtube_video_metrics = project_youtube_video_metrics(project_id)
+    voice_stats = project_voice_stats(project_id)
     account = get_youtube_account(project_id)
     return {
         "project_id": project_id,
         "sources": stats,
         "youtube_metrics": youtube_metrics,
         "youtube_video_metrics": youtube_video_metrics,
+        "voice_stats": voice_stats,
         "youtube_channel_title": account.get("channel_title") if account else None,
     }
 
@@ -614,6 +616,99 @@ def project_youtube_video_metrics(project_id: str, limit: int = 100) -> list[dic
                 "generating_model": post.get("generating_model"),
             }
         )
+    return rows
+
+
+def project_voice_stats(project_id: str, checkpoint: str = "24h") -> list[dict]:
+    sb = get_supabase()
+    try:
+        metrics = (
+            sb.table("youtube_video_metrics")
+            .select(
+                "post_id, checkpoint, views, likes, comments, watch_time_minutes, "
+                "average_view_duration_seconds"
+            )
+            .eq("project_id", project_id)
+            .eq("checkpoint", checkpoint)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        return []
+    if not metrics:
+        return []
+    post_ids = [m.get("post_id") for m in metrics if m.get("post_id")]
+    if not post_ids:
+        return []
+    try:
+        runs = (
+            sb.table("audio_generation_runs")
+            .select("post_id, tts_voice, tts_model")
+            .in_("post_id", post_ids)
+            .order("created_at", desc=True)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        return []
+    if not runs:
+        return []
+    run_map: dict[str, dict] = {}
+    for run in runs:
+        pid = run.get("post_id")
+        if pid and pid not in run_map:
+            run_map[pid] = run
+
+    buckets: dict[str, dict] = {}
+    for row in metrics:
+        pid = row.get("post_id")
+        if not pid:
+            continue
+        run = run_map.get(pid) or {}
+        voice = run.get("tts_voice") or "unknown"
+        model = run.get("tts_model") or ""
+        bucket = buckets.setdefault(
+            voice,
+            {
+                "voice_pair": voice,
+                "checkpoint": checkpoint,
+                "videos": 0,
+                "views": 0,
+                "likes": 0,
+                "comments": 0,
+                "watch_time_minutes": 0.0,
+                "average_view_duration_seconds": 0.0,
+                "tts_model": model,
+            },
+        )
+        bucket["videos"] += 1
+        bucket["views"] += int(row.get("views") or 0)
+        bucket["likes"] += int(row.get("likes") or 0)
+        bucket["comments"] += int(row.get("comments") or 0)
+        bucket["watch_time_minutes"] += float(row.get("watch_time_minutes") or 0)
+        bucket["average_view_duration_seconds"] += float(row.get("average_view_duration_seconds") or 0)
+
+    rows: list[dict] = []
+    for voice, data in buckets.items():
+        videos = data["videos"] or 1
+        rows.append(
+            {
+                "voice_pair": data["voice_pair"],
+                "checkpoint": data["checkpoint"],
+                "videos": data["videos"],
+                "avg_views": round(data["views"] / videos, 1),
+                "avg_likes": round(data["likes"] / videos, 1),
+                "avg_comments": round(data["comments"] / videos, 1),
+                "avg_watch_time_minutes": round(data["watch_time_minutes"] / videos, 2),
+                "avg_view_duration_seconds": round(
+                    data["average_view_duration_seconds"] / videos, 1
+                ),
+                "tts_model": data.get("tts_model") or "-",
+            }
+        )
+    rows.sort(key=lambda r: (r.get("avg_views") or 0), reverse=True)
     return rows
 
 

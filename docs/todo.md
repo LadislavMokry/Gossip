@@ -66,3 +66,4 @@ Legend:
 - [ ] Add metrics ingestion (YouTube first)
 - [ ] Add cost tracking in stats view
 - [ ] Add subscription CTA tracking (short-form -> podcast conversion)
+- [ ] TTS A/B: rotate Inworld voice pairs (3x3) across projects, store voice pair per audio roundup.

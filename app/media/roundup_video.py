@@ -94,7 +94,9 @@ def render_audio_roundup_video(content: dict, post_id: str, output_path: Path) -
     audio_path = output_path.parent / "audio.mp3"
     if not audio_path.exists():
         dialogue = content.get("dialogue") or []
-        render_audio_roundup(dialogue, audio_path)
+        voice_a = content.get("tts_voice_a")
+        voice_b = content.get("tts_voice_b")
+        render_audio_roundup(dialogue, audio_path, voice_a=voice_a, voice_b=voice_b)
 
     image_path = output_path.parent / "image.png"
     prompt = content.get("image_prompt") or content.get("imagePrompt")
