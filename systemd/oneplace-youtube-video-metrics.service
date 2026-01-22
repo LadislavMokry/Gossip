@@ -1,0 +1,10 @@
+[Unit]
+Description=OnePlace YouTube video checkpoint metrics (hourly)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/OnePlace
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/root/OnePlace/.venv/bin/python -m app.worker youtube-video-metrics --all-projects --max-posts 50

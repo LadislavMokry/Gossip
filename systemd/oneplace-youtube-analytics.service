@@ -1,0 +1,10 @@
+[Unit]
+Description=OnePlace YouTube analytics (daily)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/OnePlace
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/root/OnePlace/.venv/bin/python -m app.worker youtube-analytics --all-projects --days 7

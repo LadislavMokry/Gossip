@@ -1,0 +1,9 @@
+[Unit]
+Description=OnePlace YouTube analytics (daily)
+
+[Timer]
+OnCalendar=*-*-* 07:15:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
