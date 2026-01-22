@@ -222,6 +222,11 @@ Last updated: 2026-01-22
   - `/root/OnePlace/.venv/bin/python -m app.worker youtube-upload --all-projects`
   - Paste the traceback and fix accordingly.
 
+### Next session checklist
+- Confirm `oneplace-render-roundup.service` completed successfully after restart:
+  - `systemctl status oneplace-render-roundup.service --no-pager`
+  - `journalctl -u oneplace-render-roundup.service --since "today" --no-pager`
+
 ### Server status checks
 - Timers list now includes:
   - pipeline, generate, second-judge, audio-roundup, render-roundup, youtube-upload, cleanup
