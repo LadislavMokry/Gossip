@@ -15,8 +15,10 @@
 ## Step 3: Podcasts (Spotify + Apple)
 - [ ] Create creator accounts: Spotify for Podcasters + Apple Podcasts Connect.
 - [ ] Create 5 shows (one per project) with the new static artwork.
-- [ ] Decide hosting/automation path (direct API vs. RSS hosting provider).
-- [ ] Implement automated publishing once provider/API is confirmed.
+- [x] Use R2 for audio + static RSS (one feed per project).
+- [ ] Run DB patches: `db/patches/2026-01-23-podcast-posts.sql` and `db/patches/2026-01-23-podcast-image.sql`.
+- [ ] Publish to R2: `python -m app.worker publish-podcast --all-projects`.
+- [ ] Submit RSS feeds to Apple/Spotify (one-time per show).
 
 ## Step 4: Project-wide podcast images (single image per project)
 - [x] Add `projects.podcast_image_prompt` and Admin UI field.

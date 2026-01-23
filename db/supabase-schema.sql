@@ -138,6 +138,9 @@ CREATE TABLE IF NOT EXISTS posts (
   posted BOOLEAN DEFAULT FALSE,
   posted_at TIMESTAMP WITH TIME ZONE,
   post_url TEXT,
+  podcast_posted BOOLEAN DEFAULT FALSE,
+  podcast_published_at TIMESTAMP WITH TIME ZONE,
+  podcast_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -150,6 +153,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_selected
 
 CREATE INDEX IF NOT EXISTS idx_posts_posted
   ON posts(posted) WHERE posted = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_posts_podcast_posted
+  ON posts(podcast_posted) WHERE podcast_posted = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_posts_platform
   ON posts(platform);
@@ -171,6 +177,8 @@ COMMENT ON COLUMN posts.content IS 'JSONB content (varies by format - headline t
 COMMENT ON COLUMN posts.media_urls IS 'Array of media URLs (images, videos, audio files)';
 COMMENT ON COLUMN posts.posted IS 'TRUE after publishing to platform';
 COMMENT ON COLUMN posts.post_url IS 'URL of published post (from platform API response)';
+COMMENT ON COLUMN posts.podcast_posted IS 'TRUE after publishing to podcast RSS';
+COMMENT ON COLUMN posts.podcast_url IS 'URL of podcast episode audio (R2)';
 
 -- ============================================================
 -- TABLE 3: performance_metrics
@@ -516,6 +524,15 @@ ALTER TABLE IF EXISTS projects
 
 ALTER TABLE IF EXISTS sources
   ADD COLUMN IF NOT EXISTS scrape_interval_hours INTEGER DEFAULT 6;
+
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_posted BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_published_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_url TEXT;
 
 -- ============================================================
 -- HELPER VIEWS (Optional but useful)

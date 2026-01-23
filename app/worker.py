@@ -21,6 +21,7 @@ from .youtube_video_metrics import (
     fetch_youtube_video_metrics_for_project,
     fetch_youtube_video_metrics_all,
 )
+from .podcast.publish import publish_podcast_for_project, publish_podcasts_all
 from .pipeline import (
     fetch_latest_audio_roundup,
     fetch_latest_audio_roundup_for_project,
@@ -110,6 +111,18 @@ def main() -> None:
         "--refresh",
         action="store_true",
         help="Regenerate the podcast image even if it already exists",
+    )
+    publish_podcast = sub.add_parser("publish-podcast", help="Upload audio + RSS to R2")
+    publish_podcast.add_argument("--project-id", type=str, default=None, help="Project ID filter")
+    publish_podcast.add_argument(
+        "--all-projects",
+        action="store_true",
+        help="Publish podcasts for every project",
+    )
+    publish_podcast.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Re-upload audio and regenerate RSS",
     )
     sub.add_parser("render-video", help="Render latest selected video to MP4")
     yt_upload = sub.add_parser("youtube-upload", help="Upload latest audio roundup video to YouTube")
@@ -305,6 +318,21 @@ def main() -> None:
                 continue
             generated += 1
         print(f"podcast_image_generated={generated} missing_prompt={missing} failed={failed}")
+        return
+    if args.command == "publish-podcast":
+        if args.all_projects or not args.project_id:
+            results = publish_podcasts_all(refresh=args.refresh)
+            success = sum(1 for r in results if r.status == "ok")
+            print(f"podcast_publish_all={success}")
+            for row in results:
+                if row.status != "ok":
+                    print(f"project={row.project_id} status={row.status} error={row.error}")
+            return
+        result = publish_podcast_for_project(args.project_id, refresh=args.refresh)
+        if result.status == "ok":
+            print(f"podcast_publish=1 rss={result.rss_url}")
+        else:
+            print(f"podcast_publish=0 status={result.status} error={result.error}")
         return
     if args.command == "youtube-upload":
         if args.all_projects:

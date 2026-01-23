@@ -1,0 +1,11 @@
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_posted BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_published_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE IF EXISTS posts
+  ADD COLUMN IF NOT EXISTS podcast_url TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_posts_podcast_posted
+  ON posts(podcast_posted) WHERE podcast_posted = FALSE;

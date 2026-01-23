@@ -24,6 +24,16 @@ INWORLD_TTS_MODEL=inworld-tts-1.5-max
 INWORLD_TTS_BASE_URL=https://api.inworld.ai
 ```
 
+Optional (Podcast publishing via R2):
+
+```
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=oneplace-podcasts
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_PUBLIC_BASE_URL=https://pub-<id>.r2.dev
+```
+
 ## Install dependencies
 
 ```

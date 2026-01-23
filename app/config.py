@@ -58,6 +58,11 @@ class Settings(BaseModel):
     youtube_token_uri: str = "https://oauth2.googleapis.com/token"
     youtube_privacy_status: str = "public"
     podcast_subscribe_url: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: str | None = None
+    r2_bucket: str | None = None
+    r2_endpoint: str | None = None
+    r2_public_base_url: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -121,4 +126,9 @@ def get_settings() -> Settings:
         youtube_token_uri=os.environ.get("YOUTUBE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
         youtube_privacy_status=os.environ.get("YOUTUBE_PRIVACY_STATUS", "public"),
         podcast_subscribe_url=os.environ.get("PODCAST_SUBSCRIBE_URL"),
+        r2_access_key_id=os.environ.get("R2_ACCESS_KEY_ID"),
+        r2_secret_access_key=os.environ.get("R2_SECRET_ACCESS_KEY"),
+        r2_bucket=os.environ.get("R2_BUCKET"),
+        r2_endpoint=os.environ.get("R2_ENDPOINT"),
+        r2_public_base_url=os.environ.get("R2_PUBLIC_BASE_URL"),
     )
